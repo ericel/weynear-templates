@@ -1,0 +1,225 @@
+name: Publish signed template catalog
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "registry/**"
+      - "schemas/**"
+      - "scripts/**"
+      - ".github/workflows/publish-catalog.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weynear-template-catalog-publish
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install validation dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - name: Validate catalog and tests
+        run: |
+          python scripts/build_catalog.py --check
+          python -m pytest -q
+
+  publish:
+    needs: validate
+    if: vars.REGISTRY_PUBLISHING_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: automation-registry-production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GCP_PROJECT_ID: ${{ vars.REGISTRY_GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.REGISTRY_GCP_REGION }}
+      GAR_REPOSITORY: ${{ vars.REGISTRY_GAR_REPOSITORY }}
+      CATALOG_BUCKET: ${{ vars.REGISTRY_CATALOG_BUCKET }}
+      KMS_LOCATION: ${{ vars.REGISTRY_KMS_LOCATION }}
+      KMS_KEY_RING: ${{ vars.REGISTRY_KMS_KEY_RING }}
+      KMS_KEY: ${{ vars.REGISTRY_KMS_KEY }}
+      KMS_KEY_VERSION: ${{ vars.REGISTRY_KMS_KEY_VERSION }}
+      CATALOG_SIGNATURE_ALGORITHM: ec-sign-p256-sha256
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install validation dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - name: Verify protected publishing configuration
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          import yaml
+
+          required = [
+              "GCP_PROJECT_ID",
+              "GCP_REGION",
+              "GAR_REPOSITORY",
+              "CATALOG_BUCKET",
+              "KMS_LOCATION",
+              "KMS_KEY_RING",
+              "KMS_KEY",
+              "KMS_KEY_VERSION",
+          ]
+          missing = [name for name in required if not os.environ.get(name)]
+          if missing:
+              raise SystemExit(
+                  "missing trusted publishing variables: " + ", ".join(missing)
+              )
+          publisher = yaml.safe_load(
+              Path("registry/publishers/weynear.yaml").read_text()
+          )
+          spec = publisher["spec"]
+          expected_prefix = (
+              f"{os.environ['GCP_REGION']}-docker.pkg.dev/"
+              f"{os.environ['GCP_PROJECT_ID']}/"
+              f"{os.environ['GAR_REPOSITORY']}/weynear/"
+          )
+          if spec["artifact_registry"]["repository_prefix"] != expected_prefix:
+              raise SystemExit(
+                  "GitHub variables do not match protected Artifact Registry policy"
+              )
+          expected_key = (
+              f"projects/{os.environ['GCP_PROJECT_ID']}/"
+              f"locations/{os.environ['KMS_LOCATION']}/"
+              f"keyRings/{os.environ['KMS_KEY_RING']}/"
+              f"cryptoKeys/{os.environ['KMS_KEY']}/"
+              f"cryptoKeyVersions/{os.environ['KMS_KEY_VERSION']}"
+          )
+          if spec["signing"]["kms_key_resource"] != expected_key:
+              raise SystemExit(
+                  "GitHub variables do not match protected KMS policy"
+              )
+          PY
+
+      - name: Authenticate to Google Cloud with OIDC
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.REGISTRY_WIF_PROVIDER }}
+          service_account: ${{ vars.REGISTRY_PUBLISHER_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Build deterministic release
+        run: |
+          python scripts/build_catalog.py \
+            --check \
+            --release-dir release \
+            --write-signing-payload "${RUNNER_TEMP}/catalog.canonical.json"
+
+      - name: Verify immutable artifacts and attestations
+        env:
+          KMS_KEY_RESOURCE: projects/${{ env.GCP_PROJECT_ID }}/locations/${{ env.KMS_LOCATION }}/keyRings/${{ env.KMS_KEY_RING }}/cryptoKeys/${{ env.KMS_KEY }}/cryptoKeyVersions/${{ env.KMS_KEY_VERSION }}
+        run: |
+          while IFS= read -r artifact_uri; do
+            expected_digest="${artifact_uri##*@}"
+            actual_digest="$(
+              gcloud artifacts docker images describe "${artifact_uri}" \
+                --project "${GCP_PROJECT_ID}" \
+                --format='value(image_summary.digest)'
+            )"
+            [ "${actual_digest}" = "${expected_digest}" ] || {
+              echo "Artifact digest mismatch for ${artifact_uri}" >&2
+              exit 1
+            }
+            cosign verify \
+              --key "gcpkms://${KMS_KEY_RESOURCE}" \
+              "${artifact_uri}"
+            cosign verify-attestation \
+              --key "gcpkms://${KMS_KEY_RESOURCE}" \
+              --type slsaprovenance \
+              "${artifact_uri}"
+            cosign verify-attestation \
+              --key "gcpkms://${KMS_KEY_RESOURCE}" \
+              --type spdxjson \
+              "${artifact_uri}"
+          done < <(jq -r '.templates[].artifact.uri' release/catalog.json)
+
+      - name: Sign canonical catalog
+        run: |
+          openssl dgst -sha256 -binary \
+            "${RUNNER_TEMP}/catalog.canonical.json" \
+            > "${RUNNER_TEMP}/catalog.digest"
+          gcloud kms asymmetric-sign \
+            --project "${GCP_PROJECT_ID}" \
+            --location "${KMS_LOCATION}" \
+            --keyring "${KMS_KEY_RING}" \
+            --key "${KMS_KEY}" \
+            --version "${KMS_KEY_VERSION}" \
+            --digest-algorithm sha256 \
+            --input-file "${RUNNER_TEMP}/catalog.digest" \
+            --signature-file "${RUNNER_TEMP}/catalog.signature"
+
+      - name: Build signature envelope
+        env:
+          KMS_KEY_RESOURCE: projects/${{ env.GCP_PROJECT_ID }}/locations/${{ env.KMS_LOCATION }}/keyRings/${{ env.KMS_KEY_RING }}/cryptoKeys/${{ env.KMS_KEY }}/cryptoKeyVersions/${{ env.KMS_KEY_VERSION }}
+        run: |
+          python - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          temporary = Path(os.environ["RUNNER_TEMP"])
+          payload = temporary.joinpath("catalog.canonical.json").read_bytes()
+          catalog = json.loads(payload)
+          envelope = {
+              "api_version": "registry.automations.weynear.com/signature/v1",
+              "catalog_version": catalog["catalog_version"],
+              "payload_digest": "sha256:" + hashlib.sha256(payload).hexdigest(),
+              "serialization": "canonical-json-v1",
+              "algorithm": os.environ["CATALOG_SIGNATURE_ALGORITHM"],
+              "key_resource": os.environ["KMS_KEY_RESOURCE"],
+              "signature": base64.b64encode(
+                  temporary.joinpath("catalog.signature").read_bytes()
+              ).decode("ascii"),
+          }
+          Path("release/catalog.signature.json").write_text(
+              json.dumps(envelope, indent=2, sort_keys=True) + "\n"
+          )
+          PY
+
+      - name: Publish immutable versioned release
+        run: |
+          catalog_version="$(jq -r '.catalog_version' release/catalog.json)"
+          release_uri="gs://${CATALOG_BUCKET}/catalog/v${catalog_version}"
+          if gcloud storage ls "${release_uri}/catalog.json" >/dev/null 2>&1; then
+            echo "Catalog version v${catalog_version} already exists" >&2
+            exit 1
+          fi
+          gcloud storage cp --recursive release/* "${release_uri}/"

@@ -1,0 +1,45 @@
+name: Validate template contribution
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: templates-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install validation dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - name: Prevent released-version mutation
+        if: github.event_name == 'pull_request'
+        run: python scripts/check_immutability.py "${{ github.event.pull_request.base.sha }}"
+
+      - name: Validate deterministic catalog
+        run: python scripts/build_catalog.py --check
+
+      - name: Run adversarial tests
+        run: python -m pytest -q
+
+      - name: Compile tooling
+        run: python -m compileall -q scripts tests

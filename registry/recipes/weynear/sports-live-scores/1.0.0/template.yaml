@@ -1,0 +1,49 @@
+api_version: registry.automations.weynear.com/v1
+kind: AutomationTemplate
+metadata:
+  publisher: weynear
+  name: sports-live-scores
+  version: 1.0.0
+  display_name: Live Sports Scores
+  summary: Publish native score cards when a live match changes.
+  status: preview
+  license: Apache-2.0
+  categories:
+    - sports
+  tags:
+    - live-scores
+    - football
+spec:
+  source:
+    repository: https://github.com/ericel/wahalao-automation
+    commit: 215a29884c3063aaae49bb52ac144db09a590274
+    path: trusted_builtins/sports_live_scores
+  artifact:
+    uri: us-central1-docker.pkg.dev/wahalao/wahalao-automations/weynear/sports-live-scores@sha256:215a29884c3063aaae49bb52ac144db09a5902748177ecfce3da16f3f91ccbb1
+    digest: sha256:215a29884c3063aaae49bb52ac144db09a5902748177ecfce3da16f3f91ccbb1
+    media_type: application/vnd.oci.image.manifest.v1+json
+    platform:
+      os: linux
+      architecture: amd64
+  runtime_adapter: sports-live-scores-v1
+  bot_required: true
+  configuration: []
+  bindings:
+    - id: score-posts
+      kind: post_audience
+      required: true
+      manifest_destination: epl-public-posts
+      allowed_scopes:
+        - global
+        - followers
+        - custom
+      default_scope: global
+  compatibility:
+    environments:
+      - test
+      - live
+    runtime: python3.12
+  moderation:
+    content_kind: sports-scores
+    sources_required: true
+  manifest: manifest.yaml

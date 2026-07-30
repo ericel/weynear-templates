@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.weynear.com/automations/catalog-v1.json",
+  "title": "Weynear signed automation catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["api_version", "catalog_version", "templates_digest", "templates"],
+  "properties": {
+    "api_version": {
+      "const": "registry.automations.weynear.com/catalog/v1"
+    },
+    "catalog_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "templates_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "templates": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

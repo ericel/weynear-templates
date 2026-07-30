@@ -1,0 +1,312 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.weynear.com/automations/template-v1.json",
+  "title": "Weynear automation template recipe",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["api_version", "kind", "metadata", "spec"],
+  "properties": {
+    "api_version": {
+      "const": "registry.automations.weynear.com/v1"
+    },
+    "kind": {
+      "const": "AutomationTemplate"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "publisher",
+        "name",
+        "version",
+        "display_name",
+        "summary",
+        "status",
+        "license"
+      ],
+      "properties": {
+        "publisher": {
+          "$ref": "#/$defs/identifier"
+        },
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "status": {
+          "enum": ["preview", "approved", "deprecated"]
+        },
+        "license": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9.+-]{0,79}$"
+        },
+        "categories": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "icon_url": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 500
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "artifact",
+        "runtime_adapter",
+        "bot_required",
+        "configuration",
+        "bindings",
+        "compatibility",
+        "moderation",
+        "manifest"
+      ],
+      "properties": {
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository", "commit", "path"],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "pattern": "^https://github\\.com/[a-z0-9_.-]+/[a-z0-9_.-]+$"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            }
+          }
+        },
+        "artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["uri", "digest", "media_type", "platform"],
+          "properties": {
+            "uri": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]+-docker\\.pkg\\.dev/[a-z0-9-]+/[a-z0-9-]+/[a-z0-9-]+/[a-z0-9-]+@sha256:[a-f0-9]{64}$"
+            },
+            "digest": {
+              "$ref": "#/$defs/digest"
+            },
+            "media_type": {
+              "const": "application/vnd.oci.image.manifest.v1+json"
+            },
+            "platform": {
+              "const": {
+                "os": "linux",
+                "architecture": "amd64"
+              }
+            }
+          }
+        },
+        "runtime_adapter": {
+          "$ref": "#/$defs/identifier"
+        },
+        "bot_required": {
+          "type": "boolean"
+        },
+        "configuration": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["key", "type", "required", "secret", "description"],
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]{1,63}$"
+              },
+              "type": {
+                "enum": ["string", "integer", "boolean", "url"]
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "secret": {
+                "type": "boolean"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              }
+            }
+          }
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/post_binding"
+              },
+              {
+                "$ref": "#/$defs/messaging_binding"
+              }
+            ]
+          }
+        },
+        "compatibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["environments", "runtime"],
+          "properties": {
+            "environments": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": ["test", "live"]
+              }
+            },
+            "runtime": {
+              "const": "python3.12"
+            }
+          }
+        },
+        "moderation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["content_kind", "sources_required"],
+          "properties": {
+            "content_kind": {
+              "$ref": "#/$defs/identifier"
+            },
+            "sources_required": {
+              "type": "boolean"
+            }
+          }
+        },
+        "manifest": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+\\.ya?ml$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,62}$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "binding_base": {
+      "type": "object",
+      "required": ["id", "kind", "required", "manifest_destination"]
+    },
+    "post_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "required",
+        "manifest_destination",
+        "allowed_scopes",
+        "default_scope"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "kind": {
+          "const": "post_audience"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "manifest_destination": {
+          "$ref": "#/$defs/identifier"
+        },
+        "allowed_scopes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["global", "followers", "custom"]
+          }
+        },
+        "default_scope": {
+          "enum": ["global", "followers", "custom"]
+        }
+      }
+    },
+    "messaging_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "required",
+        "manifest_destination",
+        "allowed_sources",
+        "allowed_message_classes"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "kind": {
+          "const": "messaging_audience"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "manifest_destination": {
+          "$ref": "#/$defs/identifier"
+        },
+        "allowed_sources": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["bot_subscribers", "bot_topic_subscribers"]
+          }
+        },
+        "allowed_message_classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["transactional", "service", "marketing"]
+          }
+        }
+      }
+    }
+  }
+}
