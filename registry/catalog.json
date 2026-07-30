@@ -52,7 +52,7 @@
       "name": "sports-live-scores",
       "publisher": "weynear",
       "publisher_verification": {
-        "publisher_record_digest": "sha256:50e77feae8bf5533fee4d119d933b23c69fbbe269f6e90ee84ae90e0df8fa9f7",
+        "publisher_record_digest": "sha256:e3a2bc5b2014fdd4da0ad6b8a6921fda1295bb5cf9c52600cf0c7f4ece2f38cb",
         "required_attestations": [
           "slsa-provenance-v1",
           "spdx-2.3"
@@ -62,7 +62,7 @@
           "kms_key_resource": "projects/wahalao/locations/global/keyRings/automation-registry/cryptoKeys/catalog-signing/cryptoKeyVersions/1"
         },
         "trusted_builders": [
-          "https://github.com/ericel/weynear-templates/.github/workflows/publish-catalog.yml@refs/heads/main"
+          "https://github.com/ericel/wahalao-automation/.github/workflows/release-sports-template.yml@refs/heads/main"
         ]
       },
       "recipe_digest": "sha256:2c71a63fb76dcbb9b520dc3339ca2115ae3577d5d7d6783b2ee07536f83eeda3",
@@ -81,5 +81,5 @@
       "version": "1.0.0"
     }
   ],
-  "templates_digest": "sha256:0d7d300b8b43c229aa4b888957f98f0eb6efc1cae3382e640292425087403978"
+  "templates_digest": "sha256:de5d5e42da558368ff3aee7296f89c1ca39019ed840c6cc62d0a739eb59b60d5"
 }
