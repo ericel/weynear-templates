@@ -4,13 +4,13 @@
   "templates": [
     {
       "artifact": {
-        "digest": "sha256:215a29884c3063aaae49bb52ac144db09a5902748177ecfce3da16f3f91ccbb1",
+        "digest": "sha256:2755312f4f070fe80aa793341c051e65998699fa30840da9a8e4722f278414ed",
         "media_type": "application/vnd.oci.image.manifest.v1+json",
         "platform": {
           "architecture": "amd64",
           "os": "linux"
         },
-        "uri": "us-central1-docker.pkg.dev/wahalao/wahalao-automations/weynear/sports-live-scores@sha256:215a29884c3063aaae49bb52ac144db09a5902748177ecfce3da16f3f91ccbb1"
+        "uri": "us-central1-docker.pkg.dev/wahalao/wahalao-automations/weynear/sports-live-scores@sha256:2755312f4f070fe80aa793341c051e65998699fa30840da9a8e4722f278414ed"
       },
       "bindings": [
         {
@@ -65,14 +65,14 @@
           "https://github.com/ericel/wahalao-automation/.github/workflows/release-sports-template.yml@refs/heads/main"
         ]
       },
-      "recipe_digest": "sha256:2c71a63fb76dcbb9b520dc3339ca2115ae3577d5d7d6783b2ee07536f83eeda3",
+      "recipe_digest": "sha256:beadf35d6115a48e93b162f11eec1fb62486b8243758fff9a969a8d07f0be27c",
       "runtime_adapter": "sports-live-scores-v1",
       "source": {
-        "commit": "215a29884c3063aaae49bb52ac144db09a590274",
+        "commit": "ab52a0ac8ddff201f8e6685a38cf726e833ab55f",
         "path": "trusted_builtins/sports_live_scores",
         "repository": "https://github.com/ericel/wahalao-automation"
       },
-      "status": "preview",
+      "status": "approved",
       "summary": "Publish native score cards when a live match changes.",
       "tags": [
         "live-scores",
@@ -81,5 +81,5 @@
       "version": "1.0.0"
     }
   ],
-  "templates_digest": "sha256:de5d5e42da558368ff3aee7296f89c1ca39019ed840c6cc62d0a739eb59b60d5"
+  "templates_digest": "sha256:22d18e41e210331b2e747b4e4c214696cd2542692599ac3983bff9950c0b6346"
 }
