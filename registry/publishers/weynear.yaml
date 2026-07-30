@@ -11,7 +11,7 @@ spec:
   artifact_registry:
     repository_prefix: us-central1-docker.pkg.dev/wahalao/wahalao-automations/weynear/
   builders:
-    - https://github.com/ericel/weynear-templates/.github/workflows/publish-catalog.yml@refs/heads/main
+    - https://github.com/ericel/wahalao-automation/.github/workflows/release-sports-template.yml@refs/heads/main
   signing:
     algorithm: ec-sign-p256-sha256
     kms_key_resource: projects/wahalao/locations/global/keyRings/automation-registry/cryptoKeys/catalog-signing/cryptoKeyVersions/1

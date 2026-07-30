@@ -9,6 +9,7 @@ import yaml
 
 from scripts import build_catalog as catalog
 from scripts import check_immutability as immutability
+from scripts import promote_template as promotion
 
 
 def isolated_registry(tmp_path: Path, monkeypatch):
@@ -213,6 +214,46 @@ def test_catalog_version_is_positive_integer(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError, match="positive integer"):
         catalog.build_catalog()
+
+
+def test_trusted_builder_can_promote_preview_recipe(tmp_path, monkeypatch):
+    registry, recipe, _, _ = isolated_registry(tmp_path, monkeypatch)
+    source_commit = "a" * 40
+    artifact_digest = f"sha256:{'b' * 64}"
+
+    promoted = promotion.promote(
+        registry,
+        publisher="weynear",
+        name="sports-live-scores",
+        version="1.0.0",
+        source_commit=source_commit,
+        artifact_digest=artifact_digest,
+    )
+
+    assert promoted == recipe
+    document = yaml.safe_load(recipe.read_text(encoding="utf-8"))
+    assert document["metadata"]["status"] == "approved"
+    assert document["spec"]["source"]["commit"] == source_commit
+    assert document["spec"]["artifact"]["digest"] == artifact_digest
+    assert document["spec"]["artifact"]["uri"].endswith(
+        f"@{artifact_digest}"
+    )
+    built, _ = catalog.build_catalog()
+    assert built["templates"][0]["status"] == "approved"
+
+
+def test_promotion_rejects_untrusted_digest_shape(tmp_path, monkeypatch):
+    registry, _, _, _ = isolated_registry(tmp_path, monkeypatch)
+
+    with pytest.raises(ValueError, match="invalid artifact digest"):
+        promotion.promote(
+            registry,
+            publisher="weynear",
+            name="sports-live-scores",
+            version="1.0.0",
+            source_commit="a" * 40,
+            artifact_digest="latest",
+        )
 
 
 def test_immutability_check_maps_any_version_file_to_its_template():

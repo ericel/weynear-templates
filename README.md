@@ -45,6 +45,22 @@ To regenerate the deterministic catalog after an intentional recipe change:
 .venv/bin/python scripts/build_catalog.py --write
 ```
 
+Trusted artifact builders promote an existing preview recipe with:
+
+```bash
+.venv/bin/python scripts/promote_template.py \
+  --publisher weynear \
+  --name sports-live-scores \
+  --version 1.0.0 \
+  --source-commit <full-git-sha> \
+  --artifact-digest sha256:<oci-manifest-digest>
+.venv/bin/python scripts/build_catalog.py --write
+```
+
+Promotion is still submitted as a pull request. The helper accepts only a
+digest-qualified artifact in the recipe's existing publisher namespace and
+only transitions `preview` to `approved`.
+
 ## Submitting a template
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md), add a new immutable semantic-version
