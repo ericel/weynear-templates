@@ -61,7 +61,7 @@ def test_catalog_is_deterministic_and_digest_pinned():
         template["name"],
         template["version"],
         template["status"],
-    ) == ("weynear", "sports-live-scores", "1.0.0", "preview")
+    ) == ("weynear", "sports-live-scores", "1.0.0", "approved")
     assert template["source"]["repository"] == (
         "https://github.com/ericel/wahalao-automation"
     )
