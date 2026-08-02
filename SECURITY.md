@@ -18,6 +18,8 @@ Published coordinates are immutable. A compromised version is revoked rather
 than silently replaced.
 
 Contributor workflows are deliberately credential-free. Untrusted source build
-instructions run before the central workflow acquires its short-lived cloud
-identity. Only the index repository may push artifacts, generate attestations,
-sign with KMS, or publish the installable catalog.
+instructions run in a separate job with read-only repository access and no
+GitHub OIDC permission. A protected downstream job receives only the exported
+image and SBOM before acquiring its short-lived cloud identity. Only the index
+repository may push artifacts, generate provenance, sign with KMS, or publish
+the installable catalog.

@@ -14,10 +14,12 @@ KMS_KEY="${KMS_KEY:-catalog-signing}"
 KMS_KEY_VERSION="${KMS_KEY_VERSION:-1}"
 
 PUBLISHER_SA_NAME="${PUBLISHER_SA_NAME:-gh-publisher-automation}"
+BUILDER_SA_NAME="${BUILDER_SA_NAME:-gh-builder-automation}"
 POOL_ID="${POOL_ID:-github-actions}"
 PROVIDER_ID="${PROVIDER_ID:-github}"
 GITHUB_OWNER="${GITHUB_OWNER:-ericel}"
 GITHUB_REPO="${GITHUB_REPO:-weynear-templates}"
+LEGACY_GITHUB_REPO="${LEGACY_GITHUB_REPO:-wahalao-automation}"
 
 die() {
   printf 'ERROR: %s\n' "$*" >&2
@@ -27,6 +29,8 @@ die() {
 command -v gcloud >/dev/null 2>&1 || die "gcloud is required"
 [[ "$PUBLISHER_SA_NAME" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]] ||
   die "invalid publisher service-account name"
+[[ "$BUILDER_SA_NAME" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]] ||
+  die "invalid builder service-account name"
 
 gcloud config set project "$PROJECT_ID" >/dev/null
 gcloud services enable \
@@ -54,11 +58,18 @@ gcloud kms keys describe "$KMS_KEY" \
   die "missing catalog KMS key; run the Automation provisioner first"
 
 PUBLISHER_SA_EMAIL="${PUBLISHER_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+BUILDER_SA_EMAIL="${BUILDER_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 if ! gcloud iam service-accounts describe "$PUBLISHER_SA_EMAIL" \
   --project="$PROJECT_ID" >/dev/null 2>&1; then
   gcloud iam service-accounts create "$PUBLISHER_SA_NAME" \
     --project="$PROJECT_ID" \
     --display-name="GitHub Actions Weynear template catalog publisher" >/dev/null
+fi
+if ! gcloud iam service-accounts describe "$BUILDER_SA_EMAIL" \
+  --project="$PROJECT_ID" >/dev/null 2>&1; then
+  gcloud iam service-accounts create "$BUILDER_SA_NAME" \
+    --project="$PROJECT_ID" \
+    --display-name="GitHub Actions Weynear template artifact builder" >/dev/null
 fi
 
 if ! gcloud iam workload-identity-pools describe "$POOL_ID" \
@@ -89,12 +100,23 @@ PROJECT_NUMBER="$(
 WIF_POOL="projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}"
 WIF_PROVIDER="${WIF_POOL}/providers/${PROVIDER_ID}"
 REPOSITORY_PRINCIPAL="principalSet://iam.googleapis.com/${WIF_POOL}/attribute.repository/${GITHUB_OWNER}/${GITHUB_REPO}"
+LEGACY_REPOSITORY_PRINCIPAL="principalSet://iam.googleapis.com/${WIF_POOL}/attribute.repository/${GITHUB_OWNER}/${LEGACY_GITHUB_REPO}"
 
-gcloud iam service-accounts add-iam-policy-binding "$PUBLISHER_SA_EMAIL" \
-  --project="$PROJECT_ID" \
-  --member="$REPOSITORY_PRINCIPAL" \
-  --role=roles/iam.workloadIdentityUser \
-  --quiet >/dev/null
+for service_account in "$PUBLISHER_SA_EMAIL" "$BUILDER_SA_EMAIL"; do
+  gcloud iam service-accounts add-iam-policy-binding "$service_account" \
+    --project="$PROJECT_ID" \
+    --member="$REPOSITORY_PRINCIPAL" \
+    --role=roles/iam.workloadIdentityUser \
+    --quiet >/dev/null
+done
+
+for service_account in "$PUBLISHER_SA_EMAIL" "$BUILDER_SA_EMAIL"; do
+  gcloud iam service-accounts remove-iam-policy-binding "$service_account" \
+    --project="$PROJECT_ID" \
+    --member="$LEGACY_REPOSITORY_PRINCIPAL" \
+    --role=roles/iam.workloadIdentityUser \
+    --quiet >/dev/null 2>&1 || true
+done
 
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${PUBLISHER_SA_EMAIL}" \
@@ -102,11 +124,25 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --condition=None \
   --quiet >/dev/null
 
+gcloud artifacts repositories add-iam-policy-binding "$GAR_REPOSITORY" \
+  --project="$PROJECT_ID" \
+  --location="$REGION" \
+  --member="serviceAccount:${BUILDER_SA_EMAIL}" \
+  --role=roles/artifactregistry.writer \
+  --quiet >/dev/null
+
 gcloud kms keys add-iam-policy-binding "$KMS_KEY" \
   --project="$PROJECT_ID" \
   --location="$KMS_LOCATION" \
   --keyring="$KMS_KEY_RING" \
   --member="serviceAccount:${PUBLISHER_SA_EMAIL}" \
+  --role=roles/cloudkms.signerVerifier \
+  --quiet >/dev/null
+gcloud kms keys add-iam-policy-binding "$KMS_KEY" \
+  --project="$PROJECT_ID" \
+  --location="$KMS_LOCATION" \
+  --keyring="$KMS_KEY_RING" \
+  --member="serviceAccount:${BUILDER_SA_EMAIL}" \
   --role=roles/cloudkms.signerVerifier \
   --quiet >/dev/null
 
@@ -133,6 +169,7 @@ Create these GitHub repository or protected-environment variables:
   REGISTRY_KMS_KEY_VERSION=${KMS_KEY_VERSION}
   REGISTRY_WIF_PROVIDER=${WIF_PROVIDER}
   REGISTRY_PUBLISHER_SERVICE_ACCOUNT=${PUBLISHER_SA_EMAIL}
+  REGISTRY_BUILDER_SERVICE_ACCOUNT=${BUILDER_SA_EMAIL}
 
 Keep REGISTRY_PUBLISHING_ENABLED=false until every catalog artifact has a real
 digest, Cosign signature, SLSA provenance, and SPDX SBOM.

@@ -21,19 +21,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment: automation-registry-production
     permissions:
-      contents: write
-      id-token: write
-      pull-requests: write
-    env:
-      GCP_PROJECT_ID: ${{ vars.REGISTRY_GCP_PROJECT_ID }}
-      GCP_REGION: ${{ vars.REGISTRY_GCP_REGION }}
-      GAR_REPOSITORY: ${{ vars.REGISTRY_GAR_REPOSITORY }}
-      KMS_LOCATION: ${{ vars.REGISTRY_KMS_LOCATION }}
-      KMS_KEY_RING: ${{ vars.REGISTRY_KMS_KEY_RING }}
-      KMS_KEY: ${{ vars.REGISTRY_KMS_KEY }}
-      KMS_KEY_VERSION: ${{ vars.REGISTRY_KMS_KEY_VERSION }}
+      contents: read
     steps:
       - name: Checkout central index
         uses: actions/checkout@v7.0.1
@@ -78,6 +67,79 @@ jobs:
             --tag "central-template-candidate:${GITHUB_RUN_ID}" \
             "template-source/${{ steps.request.outputs.context }}"
 
+      - name: Export unprivileged build result
+        run: |
+          mkdir -p release
+          docker save \
+            --output release/candidate-image.tar \
+            "central-template-candidate:${GITHUB_RUN_ID}"
+
+      - name: Generate SPDX SBOM without credentials
+        uses: anchore/sbom-action@v0.24.0
+        with:
+          image: central-template-candidate:${{ github.run_id }}
+          format: spdx-json
+          output-file: release/sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Transfer build result to protected publisher
+        uses: actions/upload-artifact@v4
+        with:
+          name: central-template-candidate-${{ github.run_id }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: automation-registry-production
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: write
+    env:
+      GCP_PROJECT_ID: ${{ vars.REGISTRY_GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.REGISTRY_GCP_REGION }}
+      GAR_REPOSITORY: ${{ vars.REGISTRY_GAR_REPOSITORY }}
+      KMS_LOCATION: ${{ vars.REGISTRY_KMS_LOCATION }}
+      KMS_KEY_RING: ${{ vars.REGISTRY_KMS_KEY_RING }}
+      KMS_KEY: ${{ vars.REGISTRY_KMS_KEY }}
+      KMS_KEY_VERSION: ${{ vars.REGISTRY_KMS_KEY_VERSION }}
+    steps:
+      - name: Checkout central index
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install index tooling
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - name: Resolve reviewed source-only recipe
+        id: request
+        run: |
+          python scripts/pending_builds.py \
+            --publisher "${{ inputs.publisher }}" \
+            --name "${{ inputs.name }}" \
+            --version "${{ inputs.version }}" \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Download unprivileged build result
+        uses: actions/download-artifact@v4
+        with:
+          name: central-template-candidate-${{ github.run_id }}
+          path: release
+
+      - name: Load reviewed image without executing it
+        run: docker load --input release/candidate-image.tar
+
       - name: Verify protected publishing configuration
         run: |
           missing=()
@@ -89,11 +151,11 @@ jobs:
             exit 1
           }
 
-      - name: Authenticate central publisher to Google Cloud
+      - name: Authenticate protected artifact publisher to Google Cloud
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.REGISTRY_WIF_PROVIDER }}
-          service_account: ${{ vars.REGISTRY_PUBLISHER_SERVICE_ACCOUNT }}
+          service_account: ${{ vars.REGISTRY_BUILDER_SERVICE_ACCOUNT }}
 
       - uses: google-github-actions/setup-gcloud@v3.0.1
         with:
@@ -124,15 +186,6 @@ jobs:
           echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
           echo "uri=${image}@${digest}" >> "${GITHUB_OUTPUT}"
           mkdir -p release
-
-      - name: Generate SPDX SBOM
-        uses: anchore/sbom-action@v0.24.0
-        with:
-          image: ${{ steps.artifact.outputs.uri }}
-          format: spdx-json
-          output-file: release/sbom.spdx.json
-          upload-artifact: false
-          upload-release-assets: false
 
       - name: Generate central SLSA provenance
         run: |
