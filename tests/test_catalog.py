@@ -203,6 +203,23 @@ def test_source_only_preview_is_valid_but_not_installable(tmp_path, monkeypatch)
     assert not any(item["version"] == "1.0.0" for item in built["templates"])
 
 
+def test_new_recipe_requires_private_submission_id(tmp_path, monkeypatch):
+    registry, recipe, _, _ = isolated_registry(tmp_path, monkeypatch)
+    destination = (
+        registry / "recipes" / "weynear" / "sports-live-scores" / "2.1.0"
+    )
+    shutil.copytree(recipe.parent, destination)
+
+    def make_new(value):
+        value["metadata"]["version"] = "2.1.0"
+        value["metadata"].pop("submission_id", None)
+
+    mutate_yaml(destination / "template.yaml", make_new)
+
+    with pytest.raises(ValueError, match="metadata.submission_id is required"):
+        catalog.build_catalog()
+
+
 def test_approved_recipe_cannot_omit_trusted_artifact(tmp_path, monkeypatch):
     _, recipe, _, _ = isolated_registry(tmp_path, monkeypatch)
     mutate_yaml(recipe, lambda value: value["spec"].pop("artifact"))

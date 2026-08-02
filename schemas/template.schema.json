@@ -25,6 +25,10 @@
         "license"
       ],
       "properties": {
+        "submission_id": {
+          "type": "string",
+          "pattern": "^atsub_[a-f0-9]{32}$"
+        },
         "publisher": {
           "$ref": "#/$defs/identifier"
         },

@@ -2,16 +2,18 @@
 
 ## Before opening a pull request
 
-1. Register the publisher through a separate owner-approved change.
-2. Push the executable source and reproducible Docker build definition to a
+1. Create an app-owned private submission from the Wahalao developer console
+   and place its opaque `atsub_...` identifier in `metadata.submission_id`.
+2. Register the publisher through a separate owner-approved change.
+3. Push the executable source and reproducible Docker build definition to a
    public, immutable Git commit.
-3. Add a source-only `preview` recipe with `spec.build`; do not declare an
+4. Add a source-only `preview` recipe with `spec.build`; do not declare an
    artifact URI or digest.
-4. Add a new semantic-version directory. Never edit a released version.
-5. Declare the smallest possible connections, permissions, bindings, quotas,
+5. Add a new semantic-version directory. Never edit a released version.
+6. Declare the smallest possible connections, permissions, bindings, quotas,
    and content class.
-6. Add fixtures and tests to the source repository.
-7. Validate the contribution. Pull-request CI checks out the declared commit
+7. Add fixtures and tests to the source repository.
+8. Validate the contribution. Pull-request CI checks out the declared commit
    and builds it without credentials.
 
 After review, a Weynear maintainer invokes the central builder. The index—not
@@ -27,6 +29,8 @@ signs the artifact, and opens the promotion PR containing the resulting digest.
   may add the digest-qualified `REGION-docker.pkg.dev/...@sha256:...` artifact.
 - Recipe fields cannot contain secrets, user IDs, recipient lists, bot IDs, or
   application IDs.
+- Recipes cannot declare ownership or visibility. Automation resolves the
+  signed submission ID to its server-side organization/application grant.
 - Provider credentials are declared with `secret: true`, a supported
   `secret_type`, and `required_environments`. The key must match a declared
   connection's `secret_name`. Pull requests contain only this metadata;
