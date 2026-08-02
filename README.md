@@ -77,7 +77,8 @@ Cloud credentials.
 ## Cloud publisher binding
 
 After the private Automation provisioner creates the shared GAR, KMS, bucket,
-and publisher service account, bind this public repository to that identity:
+and separate builder and catalog-publisher service accounts, bind this public
+repository to those identities:
 
 ```bash
 ./gcloud_registry_publisher.sh

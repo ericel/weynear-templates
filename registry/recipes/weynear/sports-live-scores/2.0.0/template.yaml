@@ -1,0 +1,77 @@
+api_version: registry.automations.weynear.com/v1
+kind: AutomationTemplate
+metadata:
+  publisher: weynear
+  name: sports-live-scores
+  version: 2.0.0
+  display_name: Live Sports Scores
+  summary: Publish league score cards and significant-event alerts to one consented
+    topic audience.
+  status: preview
+  license: Apache-2.0
+  categories:
+  - sports
+  tags:
+  - live-scores
+  - football
+  - leagues
+  - alerts
+spec:
+  source:
+    repository: https://github.com/ericel/wahalao-template-maker
+    commit: 6670a47e816fa0752b7fa73fc04ebde2f0ee243b
+    path: templates/sports-live-scores
+  build:
+    context: templates/sports-live-scores
+    dockerfile: templates/sports-live-scores/Dockerfile
+    platform:
+      os: linux
+      architecture: amd64
+  runtime_adapter: sports-live-scores-v1
+  bot_required: true
+  configuration:
+  - key: API_FOOTBALL_KEY
+    type: string
+    required: false
+    required_environments:
+    - live
+    secret: true
+    secret_type: api_key
+    description: API key issued by dashboard.api-football.com.
+  bindings:
+  - id: score-posts
+    kind: post_audience
+    required: true
+    manifest_destination: league-score-posts
+    allowed_scopes:
+    - custom
+    default_scope: custom
+    topic_configuration:
+      premier_league:
+        SPORTS_API_URL: https://v3.football.api-sports.io/fixtures?live=39
+      spanish_league:
+        SPORTS_API_URL: https://v3.football.api-sports.io/fixtures?live=140
+      la_liga:
+        SPORTS_API_URL: https://v3.football.api-sports.io/fixtures?live=140
+  - id: score-alerts
+    kind: messaging_audience
+    required: true
+    manifest_destination: league-score-alerts
+    allowed_sources:
+    - bot_topic_subscribers
+    allowed_message_classes:
+    - marketing
+    supported_topics:
+    - premier_league
+    - spanish_league
+    - la_liga
+    paired_with: score-posts
+  compatibility:
+    environments:
+    - test
+    - live
+    runtime: python3.12
+  moderation:
+    content_kind: sports-scores
+    sources_required: true
+  manifest: manifest.yaml
