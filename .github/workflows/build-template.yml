@@ -65,6 +65,9 @@ jobs:
           }
           echo "epoch=${epoch}" >> "${GITHUB_OUTPUT}"
 
+      - name: Set up isolated Docker builder
+        uses: docker/setup-buildx-action@v4.2.0
+
       # This executes contributor build instructions before any cloud identity
       # exists on the runner. The resulting local image is pushed later without
       # rerunning contributor-controlled build steps.
@@ -72,20 +75,19 @@ jobs:
         env:
           SOURCE_DATE_EPOCH: ${{ steps.source_time.outputs.epoch }}
         run: |
-          docker build \
+          mkdir -p release
+          docker buildx build \
             --file "template-source/${{ steps.request.outputs.dockerfile }}" \
+            --platform linux/amd64 \
+            --provenance=false \
+            --sbom=false \
             --build-arg "SOURCE_COMMIT=${{ steps.request.outputs.commit }}" \
             --build-arg "TEMPLATE_VERSION=${{ steps.request.outputs.version }}" \
             --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}" \
             --tag "central-template-candidate:${GITHUB_RUN_ID}" \
+            --output "type=docker,dest=release/candidate-image.tar,rewrite-timestamp=true" \
             "template-source/${{ steps.request.outputs.context }}"
-
-      - name: Export unprivileged build result
-        run: |
-          mkdir -p release
-          docker save \
-            --output release/candidate-image.tar \
-            "central-template-candidate:${GITHUB_RUN_ID}"
+          docker load --input release/candidate-image.tar
 
       - name: Generate SPDX SBOM without credentials
         uses: anchore/sbom-action@v0.24.0
