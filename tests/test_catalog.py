@@ -52,7 +52,9 @@ def test_catalog_is_deterministic_and_digest_pinned():
     second, _ = catalog.build_catalog()
 
     assert first == second
-    assert first["catalog_version"] == 6
+    assert first["catalog_version"] == int(
+        catalog.CATALOG_VERSION.read_text(encoding="utf-8").strip()
+    )
     assert first["templates_digest"] == catalog.sha256(
         catalog.canonical_bytes(first["templates"])
     )
