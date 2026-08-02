@@ -55,15 +55,28 @@ jobs:
           path: template-source
           persist-credentials: false
 
+      - name: Resolve reproducible source timestamp
+        id: source_time
+        run: |
+          epoch="$(git -C template-source show -s --format=%ct "${{ steps.request.outputs.commit }}")"
+          [[ "${epoch}" =~ ^[0-9]+$ ]] || {
+            echo "::error::Source commit did not provide a Unix timestamp"
+            exit 1
+          }
+          echo "epoch=${epoch}" >> "${GITHUB_OUTPUT}"
+
       # This executes contributor build instructions before any cloud identity
       # exists on the runner. The resulting local image is pushed later without
       # rerunning contributor-controlled build steps.
       - name: Build reviewed source without credentials
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.source_time.outputs.epoch }}
         run: |
           docker build \
             --file "template-source/${{ steps.request.outputs.dockerfile }}" \
             --build-arg "SOURCE_COMMIT=${{ steps.request.outputs.commit }}" \
             --build-arg "TEMPLATE_VERSION=${{ steps.request.outputs.version }}" \
+            --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}" \
             --tag "central-template-candidate:${GITHUB_RUN_ID}" \
             "template-source/${{ steps.request.outputs.context }}"
 
@@ -239,9 +252,12 @@ jobs:
           git add registry/catalog.json registry/catalog-version.txt \
             "registry/recipes/${{ inputs.publisher }}/${{ inputs.name }}/${{ inputs.version }}/template.yaml"
           git commit -m "Promote ${{ inputs.publisher }}/${{ inputs.name }}@${{ inputs.version }}"
+          git fetch origin \
+            "refs/heads/${branch}:refs/remotes/origin/${branch}" || true
           git push --force-with-lease origin "HEAD:refs/heads/${branch}"
-          gh pr create \
-            --base main \
-            --head "${branch}" \
-            --title "Promote ${{ inputs.publisher }}/${{ inputs.name }}@${{ inputs.version }}" \
-            --body "Built centrally from ${{ steps.request.outputs.repository }}@${{ steps.request.outputs.commit }}, then signed and attested by the Weynear index."
+          gh pr view "${branch}" --json url --jq .url ||
+            gh pr create \
+              --base main \
+              --head "${branch}" \
+              --title "Promote ${{ inputs.publisher }}/${{ inputs.name }}@${{ inputs.version }}" \
+              --body "Built centrally from ${{ steps.request.outputs.repository }}@${{ steps.request.outputs.commit }}, then signed and attested by the Weynear index."
