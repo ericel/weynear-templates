@@ -19,7 +19,7 @@ metadata:
 spec:
   source:
     repository: https://github.com/ericel/wahalao-template-maker
-    commit: 6940c10ac68cd07a23181ac008b7c70b85cbf5f7
+    commit: 6670a47e816fa0752b7fa73fc04ebde2f0ee243b
     path: templates/sports-live-scores
   build:
     context: templates/sports-live-scores
