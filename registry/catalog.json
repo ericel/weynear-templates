@@ -1,6 +1,6 @@
 {
   "api_version": "registry.automations.weynear.com/catalog/v1",
-  "catalog_version": 6,
+  "catalog_version": 7,
   "templates": [
     {
       "artifact": {
@@ -485,7 +485,127 @@
         "alerts"
       ],
       "version": "1.4.0"
+    },
+    {
+      "artifact": {
+        "digest": "sha256:54b665072056ef8417fc1ddd9ef44ddf4b7d5c5914aaac7b17ed42c936cc70c5",
+        "media_type": "application/vnd.oci.image.manifest.v1+json",
+        "platform": {
+          "architecture": "amd64",
+          "os": "linux"
+        },
+        "uri": "us-central1-docker.pkg.dev/wahalao/wahalao-automations/weynear/sports-live-scores@sha256:54b665072056ef8417fc1ddd9ef44ddf4b7d5c5914aaac7b17ed42c936cc70c5"
+      },
+      "bindings": [
+        {
+          "allowed_scopes": [
+            "custom"
+          ],
+          "default_scope": "custom",
+          "id": "score-posts",
+          "kind": "post_audience",
+          "manifest_destination": "league-score-posts",
+          "required": true,
+          "topic_configuration": {
+            "la_liga": {
+              "SPORTS_API_URL": "https://v3.football.api-sports.io/fixtures?live=140"
+            },
+            "premier_league": {
+              "SPORTS_API_URL": "https://v3.football.api-sports.io/fixtures?live=39"
+            },
+            "spanish_league": {
+              "SPORTS_API_URL": "https://v3.football.api-sports.io/fixtures?live=140"
+            }
+          }
+        },
+        {
+          "allowed_message_classes": [
+            "marketing"
+          ],
+          "allowed_sources": [
+            "bot_topic_subscribers"
+          ],
+          "id": "score-alerts",
+          "kind": "messaging_audience",
+          "manifest_destination": "league-score-alerts",
+          "paired_with": "score-posts",
+          "required": true,
+          "supported_topics": [
+            "premier_league",
+            "spanish_league",
+            "la_liga"
+          ]
+        }
+      ],
+      "bot_required": true,
+      "categories": [
+        "sports"
+      ],
+      "compatibility": {
+        "environments": [
+          "test",
+          "live"
+        ],
+        "runtime": "python3.12"
+      },
+      "configuration": [
+        {
+          "description": "API key issued by dashboard.api-football.com.",
+          "key": "API_FOOTBALL_KEY",
+          "required": false,
+          "required_environments": [
+            "live"
+          ],
+          "secret": true,
+          "secret_type": "api_key",
+          "type": "string"
+        }
+      ],
+      "display_name": "Live Sports Scores",
+      "icon_url": "",
+      "install_manifest": {
+        "digest": "sha256:5dc790a0ea0e56ddd28c1190cd6d465097420a3461948edae790d174cc815e24",
+        "path": "manifests/weynear/sports-live-scores/2.0.0/manifest.yaml"
+      },
+      "license": "Apache-2.0",
+      "moderation": {
+        "content_kind": "sports-scores",
+        "sources_required": true
+      },
+      "name": "sports-live-scores",
+      "publisher": "weynear",
+      "publisher_verification": {
+        "publisher_record_digest": "sha256:688906f409533d17ef7a1288aecf50dcdc47b27b06563c12ea897a003428395a",
+        "required_attestations": [
+          "slsa-provenance-v1",
+          "spdx-2.3"
+        ],
+        "signature": {
+          "algorithm": "ec-sign-p256-sha256",
+          "kms_key_resource": "projects/wahalao/locations/global/keyRings/automation-registry/cryptoKeys/catalog-signing/cryptoKeyVersions/1"
+        },
+        "trusted_builders": [
+          "https://github.com/ericel/wahalao-automation/.github/workflows/release-sports-template.yml@refs/heads/main",
+          "https://github.com/ericel/weynear-templates/.github/workflows/build-template.yml@refs/heads/main"
+        ]
+      },
+      "recipe_digest": "sha256:fd88212911f1133ccf5427fb01071255bbff96468263d490d65553628a4cb95a",
+      "runtime_adapter": "sports-live-scores-v1",
+      "source": {
+        "commit": "6670a47e816fa0752b7fa73fc04ebde2f0ee243b",
+        "path": "templates/sports-live-scores",
+        "repository": "https://github.com/ericel/wahalao-template-maker"
+      },
+      "status": "approved",
+      "summary": "Publish league score cards and significant-event alerts to one consented topic audience.",
+      "tags": [
+        "live-scores",
+        "football",
+        "leagues",
+        "alerts"
+      ],
+      "version": "2.0.0"
     }
   ],
-  "templates_digest": "sha256:3e8a146c0a82a3399d00f3fcbe34d9048093988e2baf945e85391d456714c93e"
+  "templates_digest": "sha256:980737560f00a95bd93abdf89cc002e3c18e2c54e0b31f2b3f6f532e7d9a2ef4"
 }
