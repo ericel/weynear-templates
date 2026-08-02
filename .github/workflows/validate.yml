@@ -38,6 +38,29 @@ jobs:
       - name: Validate deterministic catalog
         run: python scripts/build_catalog.py --check
 
+      - name: Build source-only previews without credentials
+        run: |
+          python scripts/pending_builds.py > "${RUNNER_TEMP}/pending-builds.json"
+          mkdir -p "${RUNNER_TEMP}/template-sources"
+          jq -c '.[]' "${RUNNER_TEMP}/pending-builds.json" | while read -r request; do
+            publisher="$(jq -r '.publisher' <<<"${request}")"
+            name="$(jq -r '.name' <<<"${request}")"
+            version="$(jq -r '.version' <<<"${request}")"
+            repository="$(jq -r '.repository' <<<"${request}")"
+            commit="$(jq -r '.commit' <<<"${request}")"
+            context="$(jq -r '.context' <<<"${request}")"
+            dockerfile="$(jq -r '.dockerfile' <<<"${request}")"
+            target="${RUNNER_TEMP}/template-sources/${publisher}-${name}-${version}"
+            git clone --filter=blob:none "${repository}" "${target}"
+            git -C "${target}" checkout --detach "${commit}"
+            docker build \
+              --file "${target}/${dockerfile}" \
+              --build-arg "SOURCE_COMMIT=${commit}" \
+              --build-arg "TEMPLATE_VERSION=${version}" \
+              --tag "contribution/${publisher}-${name}:${version}" \
+              "${target}/${context}"
+          done
+
       - name: Run adversarial tests
         run: python -m pytest -q
 

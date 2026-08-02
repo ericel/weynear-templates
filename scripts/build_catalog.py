@@ -247,7 +247,7 @@ def validate_manifest_semantics(
 def validate_recipe(
     path: Path,
     publishers: dict[str, dict[str, Any]],
-) -> tuple[dict[str, Any], str]:
+) -> tuple[dict[str, Any] | None, str]:
     recipe = load_yaml(path)
     validate_schema(TEMPLATE_VALIDATOR, recipe, path)
     metadata = recipe["metadata"]
@@ -273,20 +273,43 @@ def validate_recipe(
         raise ValueError(f"{path}: source repository is not registered")
     if not COMMIT.fullmatch(source["commit"]) or source["commit"] == "0" * 40:
         raise ValueError(f"{path}: source commit must be a nonzero full Git SHA")
-    safe_relative_path(source["path"], f"{path}: spec.source.path")
+    source_path = safe_relative_path(source["path"], f"{path}: spec.source.path")
 
-    artifact = spec["artifact"]
-    match = GAR_URI.fullmatch(artifact["uri"])
-    if match is None:
-        raise ValueError(f"{path}: artifact must be a digest-qualified GAR URI")
-    if match.group("digest") != artifact["digest"]:
-        raise ValueError(f"{path}: artifact URI and declared digest disagree")
-    prefix = publisher["spec"]["artifact_registry"]["repository_prefix"]
-    if (
-        not artifact["uri"].startswith(prefix)
-        or match.group("image") != f"{publisher_id}/{name}"
-    ):
-        raise ValueError(f"{path}: artifact is outside the publisher namespace")
+    build = spec.get("build")
+    if build is not None:
+        context_path = safe_relative_path(
+            build["context"],
+            f"{path}: spec.build.context",
+        )
+        dockerfile_path = safe_relative_path(
+            build["dockerfile"],
+            f"{path}: spec.build.dockerfile",
+        )
+        if context_path != source_path:
+            raise ValueError(f"{path}: build context must equal spec.source.path")
+        context = PurePosixPath(context_path)
+        dockerfile = PurePosixPath(dockerfile_path)
+        if dockerfile.parent != context and context not in dockerfile.parents:
+            raise ValueError(f"{path}: Dockerfile must be inside the build context")
+
+    artifact = spec.get("artifact")
+    if artifact is None:
+        if metadata["status"] != "preview":
+            raise ValueError(f"{path}: approved/deprecated recipes require a trusted artifact")
+        if build is None:
+            raise ValueError(f"{path}: unbuilt preview recipes require spec.build")
+    else:
+        match = GAR_URI.fullmatch(artifact["uri"])
+        if match is None:
+            raise ValueError(f"{path}: artifact must be a digest-qualified GAR URI")
+        if match.group("digest") != artifact["digest"]:
+            raise ValueError(f"{path}: artifact URI and declared digest disagree")
+        prefix = publisher["spec"]["artifact_registry"]["repository_prefix"]
+        if (
+            not artifact["uri"].startswith(prefix)
+            or match.group("image") != f"{publisher_id}/{name}"
+        ):
+            raise ValueError(f"{path}: artifact is outside the publisher namespace")
 
     manifest_name = safe_relative_path(
         spec["manifest"],
@@ -308,6 +331,11 @@ def validate_recipe(
     )
     validate_manifest_semantics(rendered_manifest, spec["bindings"], manifest_path)
     manifest_digest = sha256(manifest_text.encode("utf-8"))
+
+    # Source-only previews are accepted contributions, not installable catalog
+    # entries. The trusted central builder promotes them with an OCI digest.
+    if artifact is None:
+        return None, manifest_text
 
     entry = {
         "publisher": publisher_id,
@@ -360,6 +388,8 @@ def build_catalog() -> tuple[dict[str, Any], dict[str, str]]:
     manifests: dict[str, str] = {}
     for path in sorted(RECIPES.glob("*/*/*/template.yaml")):
         entry, manifest_text = validate_recipe(path, publishers)
+        if entry is None:
+            continue
         entries.append(entry)
         manifest_path = entry["install_manifest"]["path"]
         if manifest_path in manifests:

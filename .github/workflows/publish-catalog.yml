@@ -176,9 +176,6 @@ jobs:
 
       - name: Sign canonical catalog
         run: |
-          openssl dgst -sha256 -binary \
-            "${RUNNER_TEMP}/catalog.canonical.json" \
-            > "${RUNNER_TEMP}/catalog.digest"
           gcloud kms asymmetric-sign \
             --project "${GCP_PROJECT_ID}" \
             --location "${KMS_LOCATION}" \
@@ -186,7 +183,7 @@ jobs:
             --key "${KMS_KEY}" \
             --version "${KMS_KEY_VERSION}" \
             --digest-algorithm sha256 \
-            --input-file "${RUNNER_TEMP}/catalog.digest" \
+            --input-file "${RUNNER_TEMP}/catalog.canonical.json" \
             --signature-file "${RUNNER_TEMP}/catalog.signature"
 
       - name: Build signature envelope
@@ -218,6 +215,19 @@ jobs:
               json.dumps(envelope, indent=2, sort_keys=True) + "\n"
           )
           PY
+
+      - name: Verify catalog signature before publication
+        run: |
+          gcloud kms keys versions get-public-key "${KMS_KEY_VERSION}" \
+            --project "${GCP_PROJECT_ID}" \
+            --location "${KMS_LOCATION}" \
+            --keyring "${KMS_KEY_RING}" \
+            --key "${KMS_KEY}" \
+            --output-file "${RUNNER_TEMP}/catalog-signing-public.pem"
+          openssl dgst -sha256 \
+            -verify "${RUNNER_TEMP}/catalog-signing-public.pem" \
+            -signature "${RUNNER_TEMP}/catalog.signature" \
+            "${RUNNER_TEMP}/catalog.canonical.json"
 
       - name: Publish immutable versioned release
         run: |

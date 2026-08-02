@@ -69,13 +69,32 @@ def promote(
         )
     source = spec.get("source")
     artifact = spec.get("artifact")
-    if not isinstance(source, dict) or not isinstance(artifact, dict):
-        raise ValueError("template source/artifact must be objects")
-    uri = str(artifact.get("uri") or "")
-    image, separator, _ = uri.partition("@")
-    expected_suffix = f"/{publisher}/{name}"
-    if separator != "@" or not image.endswith(expected_suffix):
-        raise ValueError("artifact URI does not match template identity")
+    if not isinstance(source, dict):
+        raise ValueError("template source must be an object")
+    if artifact is None:
+        publisher_path = registry_root / "publishers" / f"{publisher}.yaml"
+        publisher_document: Any = yaml.safe_load(
+            publisher_path.read_text(encoding="utf-8")
+        )
+        prefix = str(
+            publisher_document["spec"]["artifact_registry"]["repository_prefix"]
+        )
+        image = f"{prefix}{name}"
+        artifact = {
+            "uri": f"{image}@{artifact_digest}",
+            "digest": artifact_digest,
+            "media_type": "application/vnd.oci.image.manifest.v1+json",
+            "platform": {"os": "linux", "architecture": "amd64"},
+        }
+        spec["artifact"] = artifact
+    elif isinstance(artifact, dict):
+        uri = str(artifact.get("uri") or "")
+        image, separator, _ = uri.partition("@")
+        expected_suffix = f"/{publisher}/{name}"
+        if separator != "@" or not image.endswith(expected_suffix):
+            raise ValueError("artifact URI does not match template identity")
+    else:
+        raise ValueError("template artifact must be an object")
 
     source["commit"] = source_commit
     artifact["digest"] = artifact_digest

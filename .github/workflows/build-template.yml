@@ -1,0 +1,194 @@
+name: Centrally build template contribution
+
+on:
+  workflow_dispatch:
+    inputs:
+      publisher:
+        description: Publisher identifier
+        required: true
+        default: weynear
+      name:
+        description: Template identifier
+        required: true
+      version:
+        description: Preview recipe semantic version
+        required: true
+
+concurrency:
+  group: central-template-build-${{ inputs.publisher }}-${{ inputs.name }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: automation-registry-production
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: write
+    env:
+      GCP_PROJECT_ID: ${{ vars.REGISTRY_GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.REGISTRY_GCP_REGION }}
+      GAR_REPOSITORY: ${{ vars.REGISTRY_GAR_REPOSITORY }}
+      KMS_LOCATION: ${{ vars.REGISTRY_KMS_LOCATION }}
+      KMS_KEY_RING: ${{ vars.REGISTRY_KMS_KEY_RING }}
+      KMS_KEY: ${{ vars.REGISTRY_KMS_KEY }}
+      KMS_KEY_VERSION: ${{ vars.REGISTRY_KMS_KEY_VERSION }}
+    steps:
+      - name: Checkout central index
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install index tooling
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - name: Resolve reviewed source-only recipe
+        id: request
+        run: |
+          python scripts/pending_builds.py \
+            --publisher "${{ inputs.publisher }}" \
+            --name "${{ inputs.name }}" \
+            --version "${{ inputs.version }}" \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Checkout exact public source commit
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: ${{ steps.request.outputs.repository_slug }}
+          ref: ${{ steps.request.outputs.commit }}
+          path: template-source
+          persist-credentials: false
+
+      # This executes contributor build instructions before any cloud identity
+      # exists on the runner. The resulting local image is pushed later without
+      # rerunning contributor-controlled build steps.
+      - name: Build reviewed source without credentials
+        run: |
+          docker build \
+            --file "template-source/${{ steps.request.outputs.dockerfile }}" \
+            --build-arg "SOURCE_COMMIT=${{ steps.request.outputs.commit }}" \
+            --build-arg "TEMPLATE_VERSION=${{ steps.request.outputs.version }}" \
+            --tag "central-template-candidate:${GITHUB_RUN_ID}" \
+            "template-source/${{ steps.request.outputs.context }}"
+
+      - name: Verify protected publishing configuration
+        run: |
+          missing=()
+          for name in GCP_PROJECT_ID GCP_REGION GAR_REPOSITORY KMS_LOCATION KMS_KEY_RING KMS_KEY KMS_KEY_VERSION; do
+            [ -n "${!name:-}" ] || missing+=("${name}")
+          done
+          [ "${#missing[@]}" -eq 0 ] || {
+            echo "::error::Missing central registry variables: ${missing[*]}"
+            exit 1
+          }
+
+      - name: Authenticate central publisher to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.REGISTRY_WIF_PROVIDER }}
+          service_account: ${{ vars.REGISTRY_PUBLISHER_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v3.0.1
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - uses: sigstore/cosign-installer@v4.1.2
+        with:
+          cosign-release: v3.0.6
+
+      - name: Push previously built image
+        id: artifact
+        run: |
+          image="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GAR_REPOSITORY}/${{ inputs.publisher }}/${{ inputs.name }}"
+          tag="source-${{ steps.request.outputs.commit }}"
+          docker tag "central-template-candidate:${GITHUB_RUN_ID}" "${image}:${tag}"
+          docker push "${image}:${tag}"
+          digest="$(
+            gcloud artifacts docker images describe "${image}:${tag}" \
+              --project "${GCP_PROJECT_ID}" \
+              --format='value(image_summary.digest)'
+          )"
+          [[ "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]] || {
+            echo "::error::Artifact Registry did not return an OCI digest"
+            exit 1
+          }
+          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
+          echo "uri=${image}@${digest}" >> "${GITHUB_OUTPUT}"
+          mkdir -p release
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@v0.24.0
+        with:
+          image: ${{ steps.artifact.outputs.uri }}
+          format: spdx-json
+          output-file: release/sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Generate central SLSA provenance
+        run: |
+          python scripts/build_template_provenance.py \
+            --source-repository "${{ steps.request.outputs.repository }}" \
+            --source-commit "${{ steps.request.outputs.commit }}" \
+            --source-path "${{ steps.request.outputs.context }}" \
+            --publisher "${{ inputs.publisher }}" \
+            --name "${{ inputs.name }}" \
+            --builder-id "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/build-template.yml@refs/heads/main" \
+            --invocation-id "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --started-on "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --output release/provenance.slsa-v1.json
+
+      - name: Sign and attest central artifact
+        env:
+          ARTIFACT_URI: ${{ steps.artifact.outputs.uri }}
+        run: |
+          key="gcpkms://projects/${GCP_PROJECT_ID}/locations/${KMS_LOCATION}/keyRings/${KMS_KEY_RING}/cryptoKeys/${KMS_KEY}/cryptoKeyVersions/${KMS_KEY_VERSION}"
+          cosign sign --yes --key "${key}" "${ARTIFACT_URI}"
+          cosign attest --yes --key "${key}" --type slsaprovenance \
+            --predicate release/provenance.slsa-v1.json "${ARTIFACT_URI}"
+          cosign attest --yes --key "${key}" --type spdxjson \
+            --predicate release/sbom.spdx.json "${ARTIFACT_URI}"
+          cosign verify --key "${key}" "${ARTIFACT_URI}"
+          cosign verify-attestation --key "${key}" --type slsaprovenance "${ARTIFACT_URI}"
+          cosign verify-attestation --key "${key}" --type spdxjson "${ARTIFACT_URI}"
+
+      - name: Open central promotion PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/promote_template.py \
+            --publisher "${{ inputs.publisher }}" \
+            --name "${{ inputs.name }}" \
+            --version "${{ inputs.version }}" \
+            --source-commit "${{ steps.request.outputs.commit }}" \
+            --artifact-digest "${{ steps.artifact.outputs.digest }}"
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("registry/catalog-version.txt")
+          path.write_text(f"{int(path.read_text().strip()) + 1}\n")
+          PY
+          python scripts/build_catalog.py --write
+          python scripts/build_catalog.py --check
+          python -m pytest -q
+          branch="central-build/${{ inputs.publisher }}-${{ inputs.name }}-${{ inputs.version }}"
+          git checkout -B "${branch}"
+          git config user.name "weynear-central-builder"
+          git config user.email "central-builder@users.noreply.github.com"
+          git add registry/catalog.json registry/catalog-version.txt \
+            "registry/recipes/${{ inputs.publisher }}/${{ inputs.name }}/${{ inputs.version }}/template.yaml"
+          git commit -m "Promote ${{ inputs.publisher }}/${{ inputs.name }}@${{ inputs.version }}"
+          git push --force-with-lease origin "HEAD:refs/heads/${branch}"
+          gh pr create \
+            --base main \
+            --head "${branch}" \
+            --title "Promote ${{ inputs.publisher }}/${{ inputs.name }}@${{ inputs.version }}" \
+            --body "Built centrally from ${{ steps.request.outputs.repository }}@${{ steps.request.outputs.commit }}, then signed and attested by the Weynear index."

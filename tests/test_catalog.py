@@ -10,6 +10,7 @@ import yaml
 from scripts import build_catalog as catalog
 from scripts import check_immutability as immutability
 from scripts import promote_template as promotion
+from scripts import pending_builds as pending
 
 
 def isolated_registry(tmp_path: Path, monkeypatch):
@@ -51,7 +52,7 @@ def test_catalog_is_deterministic_and_digest_pinned():
     second, _ = catalog.build_catalog()
 
     assert first == second
-    assert first["catalog_version"] == 1
+    assert first["catalog_version"] == 6
     assert first["templates_digest"] == catalog.sha256(
         catalog.canonical_bytes(first["templates"])
     )
@@ -76,6 +77,31 @@ def test_catalog_is_deterministic_and_digest_pinned():
     assert template["install_manifest"]["digest"] == catalog.sha256(
         manifests[manifest_path].encode("utf-8")
     )
+    credential_template = next(
+        item for item in first["templates"] if item["version"] == "1.1.0"
+    )
+    requirement = credential_template["configuration"][0]
+    assert requirement["key"] == "SPORTS_API_TOKEN"
+    assert requirement["secret"] is True
+    assert requirement["secret_type"] == "bearer_token"
+    league_template = next(
+        item for item in first["templates"] if item["version"] == "1.3.0"
+    )
+    topic_configuration = league_template["bindings"][0]["topic_configuration"]
+    assert topic_configuration["premier_league"]["SPORTS_API_URL"].endswith(
+        "live=39"
+    )
+    assert topic_configuration["spanish_league"]["SPORTS_API_URL"].endswith(
+        "live=140"
+    )
+    alert_template = next(
+        item for item in first["templates"] if item["version"] == "1.4.0"
+    )
+    assert alert_template["bindings"][1]["paired_with"] == "score-posts"
+    assert alert_template["bindings"][1]["allowed_message_classes"] == [
+        "marketing"
+    ]
+    assert requirement["required_environments"] == ["live"]
 
 
 def test_checked_in_catalog_matches_builder():
@@ -83,6 +109,14 @@ def test_checked_in_catalog_matches_builder():
     assert catalog.CATALOG.read_text(encoding="utf-8") == (
         json.dumps(built, indent=2, sort_keys=True) + "\n"
     )
+
+
+def test_catalog_publisher_signs_canonical_payload_once():
+    workflow = (
+        catalog.ROOT / ".github" / "workflows" / "publish-catalog.yml"
+    ).read_text(encoding="utf-8")
+    assert '--input-file "${RUNNER_TEMP}/catalog.canonical.json"' in workflow
+    assert "catalog.digest" not in workflow
 
 
 def test_release_contains_only_catalog_declared_manifests(tmp_path):
@@ -146,6 +180,32 @@ def test_artifact_digest_must_match_uri(tmp_path, monkeypatch):
     )
 
     with pytest.raises(ValueError, match="declared digest disagree"):
+        catalog.build_catalog()
+
+
+def test_source_only_preview_is_valid_but_not_installable(tmp_path, monkeypatch):
+    _, recipe, _, _ = isolated_registry(tmp_path, monkeypatch)
+
+    def make_pending(value):
+        value["metadata"]["status"] = "preview"
+        value["spec"].pop("artifact")
+        value["spec"]["build"] = {
+            "context": "trusted_builtins/sports_live_scores",
+            "dockerfile": "trusted_builtins/sports_live_scores/Dockerfile.artifact",
+            "platform": {"os": "linux", "architecture": "amd64"},
+        }
+
+    mutate_yaml(recipe, make_pending)
+
+    built, _ = catalog.build_catalog()
+    assert not any(item["version"] == "1.0.0" for item in built["templates"])
+
+
+def test_approved_recipe_cannot_omit_trusted_artifact(tmp_path, monkeypatch):
+    _, recipe, _, _ = isolated_registry(tmp_path, monkeypatch)
+    mutate_yaml(recipe, lambda value: value["spec"].pop("artifact"))
+
+    with pytest.raises(ValueError, match="require a trusted artifact"):
         catalog.build_catalog()
 
 
@@ -240,6 +300,58 @@ def test_trusted_builder_can_promote_preview_recipe(tmp_path, monkeypatch):
     )
     built, _ = catalog.build_catalog()
     assert built["templates"][0]["status"] == "approved"
+
+
+def test_central_builder_can_promote_source_only_preview(tmp_path, monkeypatch):
+    registry, recipe, _, _ = isolated_registry(tmp_path, monkeypatch)
+    source_commit = "a" * 40
+    artifact_digest = f"sha256:{'b' * 64}"
+
+    def make_pending(value):
+        value["metadata"]["status"] = "preview"
+        value["spec"].pop("artifact")
+        value["spec"]["build"] = {
+            "context": "trusted_builtins/sports_live_scores",
+            "dockerfile": "trusted_builtins/sports_live_scores/Dockerfile.artifact",
+            "platform": {"os": "linux", "architecture": "amd64"},
+        }
+
+    mutate_yaml(recipe, make_pending)
+    promotion.promote(
+        registry,
+        publisher="weynear",
+        name="sports-live-scores",
+        version="1.0.0",
+        source_commit=source_commit,
+        artifact_digest=artifact_digest,
+    )
+
+    document = yaml.safe_load(recipe.read_text(encoding="utf-8"))
+    assert document["metadata"]["status"] == "approved"
+    assert document["spec"]["artifact"]["digest"] == artifact_digest
+    assert document["spec"]["artifact"]["uri"].endswith(f"@{artifact_digest}")
+
+
+def test_pending_build_descriptor_contains_only_public_source_data(tmp_path, monkeypatch):
+    registry, recipe, _, _ = isolated_registry(tmp_path, monkeypatch)
+
+    def make_pending(value):
+        value["metadata"]["status"] = "preview"
+        value["spec"].pop("artifact")
+        value["spec"]["build"] = {
+            "context": "trusted_builtins/sports_live_scores",
+            "dockerfile": "trusted_builtins/sports_live_scores/Dockerfile.artifact",
+            "platform": {"os": "linux", "architecture": "amd64"},
+        }
+
+    mutate_yaml(recipe, make_pending)
+    monkeypatch.setattr(pending, "RECIPES", registry / "recipes")
+
+    request = pending.select("weynear", "sports-live-scores", "1.0.0")
+    assert request["repository_slug"] == "ericel/wahalao-automation"
+    assert request["commit"] == "ab52a0ac8ddff201f8e6685a38cf726e833ab55f"
+    assert request["dockerfile"].endswith("Dockerfile.artifact")
+    assert not any("secret" in key.lower() or "token" in key.lower() for key in request)
 
 
 def test_promotion_rejects_untrusted_digest_shape(tmp_path, monkeypatch):

@@ -26,9 +26,12 @@ Each published version is immutable and identified by:
 ```
 
 Executable artifacts remain private, digest-qualified OCI images in Google
-Artifact Registry. Merging a recipe does not grant its code arbitrary access:
-Weynear validates the requested connections, permissions, quotas, bot binding,
-and destination bindings before importing the signed catalog.
+Artifact Registry. Contributors submit public source commits and reproducible
+build declarations without any Weynear credentials. The central index builds,
+attests, signs, and promotes reviewed previews. Merging a recipe does not grant
+its code arbitrary access: Weynear validates the requested connections,
+permissions, quotas, bot binding, and destination bindings before importing the
+signed catalog.
 
 ## Local validation
 
@@ -45,13 +48,15 @@ To regenerate the deterministic catalog after an intentional recipe change:
 .venv/bin/python scripts/build_catalog.py --write
 ```
 
-Trusted artifact builders promote an existing preview recipe with:
+Maintainers promote an existing source-only preview through the protected
+`Centrally build template contribution` workflow. For local testing of the
+final promotion operation:
 
 ```bash
 .venv/bin/python scripts/promote_template.py \
   --publisher weynear \
   --name sports-live-scores \
-  --version 1.0.0 \
+  --version 2.0.0 \
   --source-commit <full-git-sha> \
   --artifact-digest sha256:<oci-manifest-digest>
 .venv/bin/python scripts/build_catalog.py --write
@@ -64,12 +69,10 @@ only transitions `preview` to `approved`.
 ## Submitting a template
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md), add a new immutable semantic-version
-directory, regenerate `registry/catalog.json`, and open a pull request.
-Pull-request jobs receive no Google Cloud credentials.
-
-The initial sports recipe is a preview bootstrap entry. Before signed
-publication, replace its source commit and artifact digest with real reviewed
-and attested values.
+directory, run validation, and open a pull request. Source-only previews are
+not emitted into `registry/catalog.json`, so contributors do not manufacture or
+regenerate installable artifact records. Pull-request jobs receive no Google
+Cloud credentials.
 
 ## Cloud publisher binding
 
