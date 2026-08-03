@@ -184,6 +184,21 @@
                 "minLength": 1,
                 "maxLength": 300
               },
+              "display_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "minimum": {
+                "type": "number"
+              },
+              "maximum": {
+                "type": "number"
+              },
+              "placeholder": {
+                "type": "string",
+                "maxLength": 160
+              },
               "required_environments": {
                 "type": "array",
                 "uniqueItems": true,

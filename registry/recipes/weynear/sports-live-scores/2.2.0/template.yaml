@@ -1,0 +1,77 @@
+api_version: registry.automations.weynear.com/v1
+kind: AutomationTemplate
+metadata:
+  publisher: weynear
+  name: sports-live-scores
+  version: 2.2.0
+  submission_id: atsub_a74fc396216ca349a65d1ee8e9df90e9
+  display_name: Live Sports Scores
+  summary: Publish one API-Football league's live score cards and significant-event
+    alerts to a selected audience.
+  status: preview
+  license: Apache-2.0
+  categories:
+  - sports
+  tags:
+  - live-scores
+  - football
+  - leagues
+  - alerts
+spec:
+  source:
+    repository: https://github.com/ericel/wahalao-template-maker
+    commit: 28baf4c8ccf97d4a1505d4edda9f444ecbb1c4c5
+    path: templates/sports-live-scores
+  build:
+    context: templates/sports-live-scores
+    dockerfile: templates/sports-live-scores/Dockerfile
+    platform:
+      os: linux
+      architecture: amd64
+  runtime_adapter: sports-live-scores-v1
+  bot_required: true
+  configuration:
+  - key: API_FOOTBALL_LEAGUE_ID
+    display_name: API-Football league ID
+    type: integer
+    required: true
+    secret: false
+    minimum: 1
+    maximum: 999999
+    placeholder: '39'
+    description: Numeric league ID from API-Football, such as 39 for the English Premier
+      League.
+  - key: API_FOOTBALL_KEY
+    type: string
+    required: false
+    required_environments:
+    - live
+    secret: true
+    secret_type: api_key
+    description: API key issued by dashboard.api-football.com.
+  bindings:
+  - id: score-posts
+    kind: post_audience
+    required: true
+    manifest_destination: league-score-posts
+    allowed_scopes:
+    - custom
+    default_scope: custom
+  - id: score-alerts
+    kind: messaging_audience
+    required: true
+    manifest_destination: league-score-alerts
+    allowed_sources:
+    - bot_topic_subscribers
+    allowed_message_classes:
+    - marketing
+    paired_with: score-posts
+  compatibility:
+    environments:
+    - test
+    - live
+    runtime: python3.12
+  moderation:
+    content_kind: sports-scores
+    sources_required: true
+  manifest: manifest.yaml
