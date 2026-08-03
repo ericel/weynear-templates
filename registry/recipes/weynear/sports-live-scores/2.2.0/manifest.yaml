@@ -1,0 +1,61 @@
+api_version: automations.weynear.com/v1
+kind: Automation
+metadata:
+  name: live-sports-scores
+  display_name: ${DISPLAY_NAME}
+spec:
+  runtime:
+    language: python
+    version: "3.12"
+    entrypoint: main:handler
+  bot:
+    bot_id: ${BOT_ID}
+  configuration:
+    API_FOOTBALL_LEAGUE_ID: 0
+  destinations:
+    - id: league-score-posts
+      type: posts
+      visibility: ${BINDING:score-posts:SCOPE}
+      audience_id: ${BINDING:score-posts:RESOURCE_ID}
+      reply_policy: everyone
+    - id: league-score-alerts
+      type: messages
+      audience_id: ${BINDING:score-alerts:RESOURCE_ID}
+      message_class: marketing
+  triggers:
+    - id: live-score-poll
+      type: schedule
+      cron: "* * * * *"
+      timezone: UTC
+      concurrency_policy: FORBID
+      retry:
+        maximum_attempts: 3
+        initial_backoff_seconds: 5
+        maximum_backoff_seconds: 60
+  connections:
+    - id: sports-data
+      type: https_api
+      hosts:
+        - v3.football.api-sports.io
+      methods:
+        - GET
+      authentication:
+        type: api_key_header
+        header: x-apisports-key
+        secret_name: API_FOOTBALL_KEY
+  permissions:
+    - config:read
+    - state:read
+    - state:write
+    - http:fetch:connection:sports-data
+    - posts:upsert:destination:league-score-posts
+    - messages:broadcast:destination:league-score-alerts
+    - logs:write
+  limits:
+    timeout_seconds: 20
+    memory_mb: 256
+    temporary_disk_mb: 64
+    maximum_state_writes: 50
+    maximum_post_actions: 20
+    maximum_message_actions: 20
+    maximum_log_bytes: 65536
