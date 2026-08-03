@@ -4,7 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - "registry/**"
+      - "registry/catalog.json"
+      - "registry/catalog-version.txt"
+      - "registry/publishers/**"
       - "schemas/**"
       - "scripts/**"
       - ".github/workflows/publish-catalog.yml"
@@ -234,7 +236,13 @@ jobs:
           catalog_version="$(jq -r '.catalog_version' release/catalog.json)"
           release_uri="gs://${CATALOG_BUCKET}/catalog/v${catalog_version}"
           if gcloud storage ls "${release_uri}/catalog.json" >/dev/null 2>&1; then
-            echo "Catalog version v${catalog_version} already exists" >&2
+            existing_catalog="${RUNNER_TEMP}/published-catalog-v${catalog_version}.json"
+            gcloud storage cp "${release_uri}/catalog.json" "${existing_catalog}"
+            if cmp --silent release/catalog.json "${existing_catalog}"; then
+              echo "Catalog version v${catalog_version} is already published with identical content; nothing to publish."
+              exit 0
+            fi
+            echo "Catalog version v${catalog_version} already exists with different content" >&2
             exit 1
           fi
           gcloud storage cp --recursive release/* "${release_uri}/"
