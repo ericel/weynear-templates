@@ -1,0 +1,53 @@
+name: Dispatch pending template builds
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "registry/recipes/**/template.yaml"
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: dispatch-pending-template-builds-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout central index
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install index tooling
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - name: Dispatch newly merged source-only recipes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          pending="$(python scripts/pending_builds.py)"
+          git diff --name-only "${BEFORE_SHA}" "${GITHUB_SHA}" -- \
+            'registry/recipes/*/*/*/template.yaml' |
+          while IFS= read -r recipe; do
+            [ -n "${recipe}" ] || continue
+            request="$(jq -c --arg recipe "${recipe}" \
+              '.[] | select(.recipe == $recipe)' <<<"${pending}")"
+            [ -n "${request}" ] || continue
+            gh workflow run build-template.yml \
+              --ref main \
+              -f "publisher=$(jq -r .publisher <<<"${request}")" \
+              -f "name=$(jq -r .name <<<"${request}")" \
+              -f "version=$(jq -r .version <<<"${request}")"
+          done
