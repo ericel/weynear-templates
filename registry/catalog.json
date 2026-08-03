@@ -1,6 +1,6 @@
 {
   "api_version": "registry.automations.weynear.com/catalog/v1",
-  "catalog_version": 8,
+  "catalog_version": 9,
   "templates": [
     {
       "artifact": {
@@ -726,7 +726,123 @@
         "alerts"
       ],
       "version": "2.1.0"
+    },
+    {
+      "artifact": {
+        "digest": "sha256:4bb94d591f8af69a5858b84c5052e0212da3ebf7e8824f2737323cb194f2770f",
+        "media_type": "application/vnd.oci.image.manifest.v1+json",
+        "platform": {
+          "architecture": "amd64",
+          "os": "linux"
+        },
+        "uri": "us-central1-docker.pkg.dev/wahalao/wahalao-automations/weynear/sports-live-scores@sha256:4bb94d591f8af69a5858b84c5052e0212da3ebf7e8824f2737323cb194f2770f"
+      },
+      "bindings": [
+        {
+          "allowed_scopes": [
+            "custom"
+          ],
+          "default_scope": "custom",
+          "id": "score-posts",
+          "kind": "post_audience",
+          "manifest_destination": "league-score-posts",
+          "required": true
+        },
+        {
+          "allowed_message_classes": [
+            "marketing"
+          ],
+          "allowed_sources": [
+            "bot_topic_subscribers"
+          ],
+          "id": "score-alerts",
+          "kind": "messaging_audience",
+          "manifest_destination": "league-score-alerts",
+          "paired_with": "score-posts",
+          "required": true
+        }
+      ],
+      "bot_required": true,
+      "categories": [
+        "sports"
+      ],
+      "compatibility": {
+        "environments": [
+          "test",
+          "live"
+        ],
+        "runtime": "python3.12"
+      },
+      "configuration": [
+        {
+          "description": "Numeric league ID from API-Football, such as 39 for the English Premier League.",
+          "display_name": "API-Football league ID",
+          "key": "API_FOOTBALL_LEAGUE_ID",
+          "maximum": 999999,
+          "minimum": 1,
+          "placeholder": "39",
+          "required": true,
+          "secret": false,
+          "type": "integer"
+        },
+        {
+          "description": "API key issued by dashboard.api-football.com.",
+          "key": "API_FOOTBALL_KEY",
+          "required": false,
+          "required_environments": [
+            "live"
+          ],
+          "secret": true,
+          "secret_type": "api_key",
+          "type": "string"
+        }
+      ],
+      "display_name": "Live Sports Scores",
+      "icon_url": "",
+      "install_manifest": {
+        "digest": "sha256:207b56a6267eeeed718bd62ad1c893aee93e997679df40873ccf711c5ab79798",
+        "path": "manifests/weynear/sports-live-scores/2.2.0/manifest.yaml"
+      },
+      "license": "Apache-2.0",
+      "moderation": {
+        "content_kind": "sports-scores",
+        "sources_required": true
+      },
+      "name": "sports-live-scores",
+      "publisher": "weynear",
+      "publisher_verification": {
+        "publisher_record_digest": "sha256:688906f409533d17ef7a1288aecf50dcdc47b27b06563c12ea897a003428395a",
+        "required_attestations": [
+          "slsa-provenance-v1",
+          "spdx-2.3"
+        ],
+        "signature": {
+          "algorithm": "ec-sign-p256-sha256",
+          "kms_key_resource": "projects/wahalao/locations/global/keyRings/automation-registry/cryptoKeys/catalog-signing/cryptoKeyVersions/1"
+        },
+        "trusted_builders": [
+          "https://github.com/ericel/wahalao-automation/.github/workflows/release-sports-template.yml@refs/heads/main",
+          "https://github.com/ericel/weynear-templates/.github/workflows/build-template.yml@refs/heads/main"
+        ]
+      },
+      "recipe_digest": "sha256:8c4379f91a5b17fb6441cc63a825eeb08cdf00f755a3424129ee8f2a24bd0e2c",
+      "runtime_adapter": "sports-live-scores-v1",
+      "source": {
+        "commit": "28baf4c8ccf97d4a1505d4edda9f444ecbb1c4c5",
+        "path": "templates/sports-live-scores",
+        "repository": "https://github.com/ericel/wahalao-template-maker"
+      },
+      "status": "approved",
+      "submission_id": "atsub_a74fc396216ca349a65d1ee8e9df90e9",
+      "summary": "Publish one API-Football league's live score cards and significant-event alerts to a selected audience.",
+      "tags": [
+        "live-scores",
+        "football",
+        "leagues",
+        "alerts"
+      ],
+      "version": "2.2.0"
     }
   ],
-  "templates_digest": "sha256:ff56d55bcad52488df6dd5a962115a3794dd519144b6b51fc98f48625fbc8820"
+  "templates_digest": "sha256:1c24a562bfd6b694a282a7c408a1b2d6069ad877eb0437567e51904aef5da323"
 }
