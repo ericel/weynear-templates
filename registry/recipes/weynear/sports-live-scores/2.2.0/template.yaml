@@ -8,7 +8,7 @@ metadata:
   display_name: Live Sports Scores
   summary: Publish one API-Football league's live score cards and significant-event
     alerts to a selected audience.
-  status: preview
+  status: approved
   license: Apache-2.0
   categories:
   - sports
@@ -75,3 +75,10 @@ spec:
     content_kind: sports-scores
     sources_required: true
   manifest: manifest.yaml
+  artifact:
+    uri: us-central1-docker.pkg.dev/wahalao/wahalao-automations/weynear/sports-live-scores@sha256:4bb94d591f8af69a5858b84c5052e0212da3ebf7e8824f2737323cb194f2770f
+    digest: sha256:4bb94d591f8af69a5858b84c5052e0212da3ebf7e8824f2737323cb194f2770f
+    media_type: application/vnd.oci.image.manifest.v1+json
+    platform:
+      os: linux
+      architecture: amd64
