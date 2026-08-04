@@ -1,0 +1,68 @@
+api_version: registry.automations.weynear.com/v1
+kind: AutomationTemplate
+metadata:
+  publisher: weynear
+  name: news-feed-publisher
+  version: 1.0.0
+  submission_id: atsub_5147c5064a68a98ea3eedf8c0e6df919
+  display_name: Breaking News Feed
+  summary: Publish new articles from a reviewed RSS or Atom feed using Weynear's native
+    link previews.
+  status: preview
+  license: Apache-2.0
+  categories:
+  - news
+  tags:
+  - rss
+  - atom
+  - breaking-news
+  - link-preview
+spec:
+  source:
+    repository: https://github.com/ericel/wahalao-template-maker
+    commit: 7b17f2f6fb2fa477492e63e3ca7e43771c7a9a1b
+    path: templates/news-feed-publisher
+  build:
+    context: templates/news-feed-publisher
+    dockerfile: templates/news-feed-publisher/Dockerfile
+    platform:
+      os: linux
+      architecture: amd64
+  runtime_adapter: news-feed-publisher-v1
+  bot_required: true
+  configuration:
+  - key: NEWS_FEED_URL
+    display_name: RSS or Atom feed URL
+    type: url
+    required: false
+    secret: false
+    placeholder: https://feeds.bbci.co.uk/news/rss.xml
+    description: A reviewed BBC News feed URL. Articles are posted by canonical URL
+      and enriched by Weynear.
+  - key: MAX_ITEMS_PER_RUN
+    display_name: Maximum articles per run
+    type: integer
+    required: false
+    secret: false
+    minimum: 1
+    maximum: 20
+    description: Limits each hourly run so a busy feed cannot flood the selected audience.
+  bindings:
+  - id: news-posts
+    kind: post_audience
+    required: true
+    manifest_destination: news-posts
+    allowed_scopes:
+    - global
+    - followers
+    - custom
+    default_scope: followers
+  compatibility:
+    environments:
+    - test
+    - live
+    runtime: python3.12
+  moderation:
+    content_kind: news-links
+    sources_required: true
+  manifest: manifest.yaml

@@ -1,0 +1,55 @@
+api_version: automations.weynear.com/v1
+kind: Automation
+metadata:
+  name: news-feed-publisher
+  display_name: ${DISPLAY_NAME}
+spec:
+  runtime:
+    language: python
+    version: "3.12"
+    entrypoint: main:handler
+  bot:
+    bot_id: ${BOT_ID}
+  configuration:
+    NEWS_FEED_URL: https://feeds.bbci.co.uk/news/rss.xml
+    MAX_ITEMS_PER_RUN: 5
+  destinations:
+    - id: news-posts
+      type: posts
+      visibility: ${BINDING:news-posts:SCOPE}
+      audience_id: ${BINDING:news-posts:RESOURCE_ID}
+      reply_policy: everyone
+  triggers:
+    - id: hourly-news-poll
+      type: schedule
+      cron: "0 * * * *"
+      timezone: UTC
+      concurrency_policy: FORBID
+      retry:
+        maximum_attempts: 3
+        initial_backoff_seconds: 10
+        maximum_backoff_seconds: 120
+  connections:
+    - id: news-feed
+      type: https_api
+      hosts:
+        - feeds.bbci.co.uk
+      methods:
+        - GET
+      authentication:
+        type: none
+  permissions:
+    - config:read
+    - state:read
+    - state:write
+    - http:fetch:connection:news-feed
+    - posts:upsert:destination:news-posts
+    - logs:write
+  limits:
+    timeout_seconds: 20
+    memory_mb: 256
+    temporary_disk_mb: 64
+    maximum_state_writes: 20
+    maximum_post_actions: 20
+    maximum_message_actions: 0
+    maximum_log_bytes: 65536
