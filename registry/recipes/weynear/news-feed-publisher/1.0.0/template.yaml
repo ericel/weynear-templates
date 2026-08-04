@@ -8,7 +8,7 @@ metadata:
   display_name: Breaking News Feed
   summary: Publish new articles from a reviewed RSS or Atom feed using Weynear's native
     link previews.
-  status: preview
+  status: approved
   license: Apache-2.0
   categories:
   - news
@@ -66,3 +66,10 @@ spec:
     content_kind: news-links
     sources_required: true
   manifest: manifest.yaml
+  artifact:
+    uri: us-central1-docker.pkg.dev/wahalao/wahalao-automations/weynear/news-feed-publisher@sha256:824f1a6db0afaa0877cc8e532c60325c7c48af3a303ff261d082680513bc359f
+    digest: sha256:824f1a6db0afaa0877cc8e532c60325c7c48af3a303ff261d082680513bc359f
+    media_type: application/vnd.oci.image.manifest.v1+json
+    platform:
+      os: linux
+      architecture: amd64

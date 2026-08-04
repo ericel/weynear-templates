@@ -1,7 +1,109 @@
 {
   "api_version": "registry.automations.weynear.com/catalog/v1",
-  "catalog_version": 9,
+  "catalog_version": 10,
   "templates": [
+    {
+      "artifact": {
+        "digest": "sha256:824f1a6db0afaa0877cc8e532c60325c7c48af3a303ff261d082680513bc359f",
+        "media_type": "application/vnd.oci.image.manifest.v1+json",
+        "platform": {
+          "architecture": "amd64",
+          "os": "linux"
+        },
+        "uri": "us-central1-docker.pkg.dev/wahalao/wahalao-automations/weynear/news-feed-publisher@sha256:824f1a6db0afaa0877cc8e532c60325c7c48af3a303ff261d082680513bc359f"
+      },
+      "bindings": [
+        {
+          "allowed_scopes": [
+            "global",
+            "followers",
+            "custom"
+          ],
+          "default_scope": "followers",
+          "id": "news-posts",
+          "kind": "post_audience",
+          "manifest_destination": "news-posts",
+          "required": true
+        }
+      ],
+      "bot_required": true,
+      "categories": [
+        "news"
+      ],
+      "compatibility": {
+        "environments": [
+          "test",
+          "live"
+        ],
+        "runtime": "python3.12"
+      },
+      "configuration": [
+        {
+          "description": "A reviewed BBC News feed URL. Articles are posted by canonical URL and enriched by Weynear.",
+          "display_name": "RSS or Atom feed URL",
+          "key": "NEWS_FEED_URL",
+          "placeholder": "https://feeds.bbci.co.uk/news/rss.xml",
+          "required": false,
+          "secret": false,
+          "type": "url"
+        },
+        {
+          "description": "Limits each hourly run so a busy feed cannot flood the selected audience.",
+          "display_name": "Maximum articles per run",
+          "key": "MAX_ITEMS_PER_RUN",
+          "maximum": 20,
+          "minimum": 1,
+          "required": false,
+          "secret": false,
+          "type": "integer"
+        }
+      ],
+      "display_name": "Breaking News Feed",
+      "icon_url": "",
+      "install_manifest": {
+        "digest": "sha256:b30ab344049daac8132b4150524f419ae6d4e7b23e01a5128d91b4fc7a53f88c",
+        "path": "manifests/weynear/news-feed-publisher/1.0.0/manifest.yaml"
+      },
+      "license": "Apache-2.0",
+      "moderation": {
+        "content_kind": "news-links",
+        "sources_required": true
+      },
+      "name": "news-feed-publisher",
+      "publisher": "weynear",
+      "publisher_verification": {
+        "publisher_record_digest": "sha256:688906f409533d17ef7a1288aecf50dcdc47b27b06563c12ea897a003428395a",
+        "required_attestations": [
+          "slsa-provenance-v1",
+          "spdx-2.3"
+        ],
+        "signature": {
+          "algorithm": "ec-sign-p256-sha256",
+          "kms_key_resource": "projects/wahalao/locations/global/keyRings/automation-registry/cryptoKeys/catalog-signing/cryptoKeyVersions/1"
+        },
+        "trusted_builders": [
+          "https://github.com/ericel/wahalao-automation/.github/workflows/release-sports-template.yml@refs/heads/main",
+          "https://github.com/ericel/weynear-templates/.github/workflows/build-template.yml@refs/heads/main"
+        ]
+      },
+      "recipe_digest": "sha256:f8d346ff54718031cca1e900cba0a95ea6cb64ffdde4f1367f067266cede91c9",
+      "runtime_adapter": "news-feed-publisher-v1",
+      "source": {
+        "commit": "7b17f2f6fb2fa477492e63e3ca7e43771c7a9a1b",
+        "path": "templates/news-feed-publisher",
+        "repository": "https://github.com/ericel/wahalao-template-maker"
+      },
+      "status": "approved",
+      "submission_id": "atsub_5147c5064a68a98ea3eedf8c0e6df919",
+      "summary": "Publish new articles from a reviewed RSS or Atom feed using Weynear's native link previews.",
+      "tags": [
+        "rss",
+        "atom",
+        "breaking-news",
+        "link-preview"
+      ],
+      "version": "1.0.0"
+    },
     {
       "artifact": {
         "digest": "sha256:2755312f4f070fe80aa793341c051e65998699fa30840da9a8e4722f278414ed",
@@ -844,5 +946,5 @@
       "version": "2.2.0"
     }
   ],
-  "templates_digest": "sha256:1c24a562bfd6b694a282a7c408a1b2d6069ad877eb0437567e51904aef5da323"
+  "templates_digest": "sha256:6b50ffef9d8490691c206d30b114cfac7b2b5ae7aa883868758b4be09604e8af"
 }
