@@ -20,7 +20,7 @@ metadata:
 spec:
   source:
     repository: https://github.com/ericel/wahalao-template-maker
-    commit: 28baf4c8ccf97d4a1505d4edda9f444ecbb1c4c5
+    commit: 7b17f2f6fb2fa477492e63e3ca7e43771c7a9a1b
     path: templates/news-feed-publisher
   build:
     context: templates/news-feed-publisher
