@@ -58,13 +58,17 @@ def test_catalog_is_deterministic_and_digest_pinned():
     assert first["templates_digest"] == catalog.sha256(
         catalog.canonical_bytes(first["templates"])
     )
-    template = first["templates"][0]
-    assert (
-        template["publisher"],
-        template["name"],
-        template["version"],
-        template["status"],
-    ) == ("weynear", "sports-live-scores", "1.0.0", "approved")
+    template = next(
+        item
+        for item in first["templates"]
+        if (
+            item["publisher"],
+            item["name"],
+            item["version"],
+        )
+        == ("weynear", "sports-live-scores", "1.0.0")
+    )
+    assert template["status"] == "approved"
     assert template["source"]["repository"] == (
         "https://github.com/ericel/wahalao-automation"
     )
@@ -200,7 +204,15 @@ def test_source_only_preview_is_valid_but_not_installable(tmp_path, monkeypatch)
     mutate_yaml(recipe, make_pending)
 
     built, _ = catalog.build_catalog()
-    assert not any(item["version"] == "1.0.0" for item in built["templates"])
+    assert not any(
+        (
+            item["publisher"],
+            item["name"],
+            item["version"],
+        )
+        == ("weynear", "sports-live-scores", "1.0.0")
+        for item in built["templates"]
+    )
 
 
 def test_new_recipe_requires_private_submission_id(tmp_path, monkeypatch):
