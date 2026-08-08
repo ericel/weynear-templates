@@ -33,10 +33,6 @@ GAR_URI = re.compile(
 )
 PLACEHOLDER = re.compile(r"\$\{([^{}]+)\}")
 STATIC_PLACEHOLDERS = {"DISPLAY_NAME", "BOT_ID"}
-LEGACY_UNSCOPED_REFS = {
-    ("weynear", "sports-live-scores", version)
-    for version in ("1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "2.0.0")
-}
 
 
 def canonical_bytes(value: Any) -> bytes:
@@ -341,9 +337,6 @@ def validate_recipe(
     if artifact is None:
         return None, manifest_text
 
-    submission_id = str(metadata.get("submission_id") or "").strip()
-    if not submission_id and (publisher_id, name, version) not in LEGACY_UNSCOPED_REFS:
-        raise ValueError(f"{path}: metadata.submission_id is required for new versions")
     entry = {
         "publisher": publisher_id,
         "name": name,
@@ -379,8 +372,6 @@ def validate_recipe(
         },
         "recipe_digest": sha256(canonical_bytes(recipe)),
     }
-    if submission_id:
-        entry["submission_id"] = submission_id
     return entry, manifest_text
 
 
