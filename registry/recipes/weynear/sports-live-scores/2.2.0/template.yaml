@@ -4,7 +4,6 @@ metadata:
   publisher: weynear
   name: sports-live-scores
   version: 2.2.0
-  submission_id: atsub_a74fc396216ca349a65d1ee8e9df90e9
   display_name: Live Sports Scores
   summary: Publish one API-Football league's live score cards and significant-event
     alerts to a selected audience.

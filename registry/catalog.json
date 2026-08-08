@@ -1,6 +1,6 @@
 {
   "api_version": "registry.automations.weynear.com/catalog/v1",
-  "catalog_version": 10,
+  "catalog_version": 11,
   "templates": [
     {
       "artifact": {
@@ -86,7 +86,7 @@
           "https://github.com/ericel/weynear-templates/.github/workflows/build-template.yml@refs/heads/main"
         ]
       },
-      "recipe_digest": "sha256:f8d346ff54718031cca1e900cba0a95ea6cb64ffdde4f1367f067266cede91c9",
+      "recipe_digest": "sha256:39140707e9b1a916da419e3189cecffe4721f5da6dea7f1558613d3ad64819e1",
       "runtime_adapter": "news-feed-publisher-v1",
       "source": {
         "commit": "7b17f2f6fb2fa477492e63e3ca7e43771c7a9a1b",
@@ -94,7 +94,6 @@
         "repository": "https://github.com/ericel/wahalao-template-maker"
       },
       "status": "approved",
-      "submission_id": "atsub_5147c5064a68a98ea3eedf8c0e6df919",
       "summary": "Publish new articles from a reviewed RSS or Atom feed using Weynear's native link previews.",
       "tags": [
         "rss",
@@ -811,7 +810,7 @@
           "https://github.com/ericel/weynear-templates/.github/workflows/build-template.yml@refs/heads/main"
         ]
       },
-      "recipe_digest": "sha256:5ec34799b44e05eee1965f4d4012f169cb01cc086ffb9d9d79c7ec2dc36ba1ba",
+      "recipe_digest": "sha256:da0145b40777c2611474981cf6e967b48e65cc1972430d591421f5ee7f3b8d14",
       "runtime_adapter": "sports-live-scores-v1",
       "source": {
         "commit": "28baf4c8ccf97d4a1505d4edda9f444ecbb1c4c5",
@@ -819,7 +818,6 @@
         "repository": "https://github.com/ericel/wahalao-template-maker"
       },
       "status": "approved",
-      "submission_id": "atsub_67dd48b97bce0b3e96797d52c2afa29d",
       "summary": "Publish league score cards and significant-event alerts to one consented topic audience.",
       "tags": [
         "live-scores",
@@ -927,7 +925,7 @@
           "https://github.com/ericel/weynear-templates/.github/workflows/build-template.yml@refs/heads/main"
         ]
       },
-      "recipe_digest": "sha256:8c4379f91a5b17fb6441cc63a825eeb08cdf00f755a3424129ee8f2a24bd0e2c",
+      "recipe_digest": "sha256:37692e3ef7156b21e5c4b84b980e9158f1cca279c056d403965ad0ee66859755",
       "runtime_adapter": "sports-live-scores-v1",
       "source": {
         "commit": "28baf4c8ccf97d4a1505d4edda9f444ecbb1c4c5",
@@ -935,7 +933,6 @@
         "repository": "https://github.com/ericel/wahalao-template-maker"
       },
       "status": "approved",
-      "submission_id": "atsub_a74fc396216ca349a65d1ee8e9df90e9",
       "summary": "Publish one API-Football league's live score cards and significant-event alerts to a selected audience.",
       "tags": [
         "live-scores",
@@ -946,5 +943,5 @@
       "version": "2.2.0"
     }
   ],
-  "templates_digest": "sha256:6b50ffef9d8490691c206d30b114cfac7b2b5ae7aa883868758b4be09604e8af"
+  "templates_digest": "sha256:551bcd0f34ad9acec438add57654517d104dd0bed96dfe719d9d8809f81280f9"
 }

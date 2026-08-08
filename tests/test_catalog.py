@@ -215,20 +215,36 @@ def test_source_only_preview_is_valid_but_not_installable(tmp_path, monkeypatch)
     )
 
 
-def test_new_recipe_requires_private_submission_id(tmp_path, monkeypatch):
+def test_new_recipe_needs_no_submission_id(tmp_path, monkeypatch):
     registry, recipe, _, _ = isolated_registry(tmp_path, monkeypatch)
     destination = (
         registry / "recipes" / "weynear" / "sports-live-scores" / "99.0.0"
     )
     shutil.copytree(recipe.parent, destination)
+    mutate_yaml(
+        destination / "template.yaml",
+        lambda value: value["metadata"].update({"version": "99.0.0"}),
+    )
 
-    def make_new(value):
-        value["metadata"]["version"] = "99.0.0"
-        value["metadata"].pop("submission_id", None)
+    built, _ = catalog.build_catalog()
+    assert any(
+        (item["publisher"], item["name"], item["version"])
+        == ("weynear", "sports-live-scores", "99.0.0")
+        for item in built["templates"]
+    )
+    assert all("submission_id" not in item for item in built["templates"])
 
-    mutate_yaml(destination / "template.yaml", make_new)
 
-    with pytest.raises(ValueError, match="metadata.submission_id is required"):
+def test_recipe_carrying_submission_id_is_rejected(tmp_path, monkeypatch):
+    _, recipe, _, _ = isolated_registry(tmp_path, monkeypatch)
+    mutate_yaml(
+        recipe,
+        lambda value: value["metadata"].update(
+            {"submission_id": "atsub_" + "0" * 32}
+        ),
+    )
+
+    with pytest.raises(ValueError, match="submission_id"):
         catalog.build_catalog()
 
 
